@@ -1,6 +1,7 @@
  "use client";
 
 import dynamic from "next/dynamic";
+import { VoxelStoreExample } from "./components/VoxelStoreExample";
 
 const VoxelScene = dynamic(
   () => import("./components/VoxelScene").then((m) => m.VoxelScene),
@@ -25,9 +26,7 @@ export default function Home() {
           <span>Foundation</span>
         </div>
         <div className="ml-auto flex items-center gap-2 text-xs text-zinc-500">
-          <span className="rounded-full border border-zinc-800 px-2 py-0.5">
-            Placeholder toolbar
-          </span>
+          <VoxelStoreExample />
         </div>
       </header>
       <main className="flex flex-1 flex-col">
