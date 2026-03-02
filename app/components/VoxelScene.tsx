@@ -3,6 +3,7 @@
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { useMemo } from "react";
+import { VoxelInstances } from "./VoxelInstances";
 
 function SceneContents() {
   const gridConfig = useMemo(
@@ -42,6 +43,9 @@ function SceneContents() {
           gridConfig.colorGrid,
         ]}
       />
+
+      {/* Instanced voxel renderer - only rebuilds when voxelMap changes */}
+      <VoxelInstances />
     </>
   );
 }

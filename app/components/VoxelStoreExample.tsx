@@ -20,6 +20,7 @@ export function VoxelStoreExample() {
       { position: [0, 0, 0], color: 0x88ccff },
       { position: [1, 0, 0], color: 0xff8888 },
       { position: [0, 1, 0], color: 0x88ff88 },
+      { position: [0, 0, 1], color: 0xffffff },
     ]);
   }, []);
 

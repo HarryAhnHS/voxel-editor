@@ -42,7 +42,8 @@ interface VoxelState {
 interface VoxelActions {
   /** Returns true if voxel was added; false if out of bounds or at cap. */
   addVoxel: (x: number, y: number, z: number, color?: number) => boolean;
-  removeVoxel: (x: number, y: number, z: number) => void;
+  /** Returns the removed voxel, or null if none at that position. (Enables undo.) */
+  removeVoxel: (x: number, y: number, z: number) => Voxel | null;
   setColor: (color: number) => void;
   setTool: (tool: Tool) => void;
   clear: () => void;
@@ -79,14 +80,19 @@ export const useVoxelStore = create<VoxelState & VoxelActions>((set) => ({
     return added;
   },
 
-  removeVoxel: (x, y, z) =>
+  removeVoxel: (x, y, z) => {
+    let removed: Voxel | null = null;
     set((state) => {
       const key = keyFromXYZ(x, y, z);
-      if (!state.voxels.has(key)) return state;
+      const existing = state.voxels.get(key);
+      if (!existing) return state;
+      removed = existing;
       const next = new Map(state.voxels);
       next.delete(key);
       return { voxels: next };
-    }),
+    });
+    return removed;
+  },
 
   setColor: (color) => set({ selectedColor: color }),
 
@@ -135,7 +141,7 @@ export {
 //
 // addVoxel(0, 0, 0);                    // uses selectedColor
 // addVoxel(1, 0, 0, 0xff0000);          // explicit color
-// removeVoxel(0, 0, 0);
+// const removed = removeVoxel(0, 0, 0);  // Voxel | null for undo
 // setColor(0x00ff00);
 // setTool("remove");
 // clear();
