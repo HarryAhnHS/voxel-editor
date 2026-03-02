@@ -2,6 +2,8 @@
 
 import dynamic from "next/dynamic";
 import { VoxelStoreExample } from "./components/VoxelStoreExample";
+import { StressTest } from "./components/StressTest";
+import { FPSCounter } from "./components/FPSCounter";
 
 const VoxelScene = dynamic(
   () => import("./components/VoxelScene").then((m) => m.VoxelScene),
@@ -25,8 +27,12 @@ export default function Home() {
           <span className="h-4 w-px bg-zinc-700" />
           <span>Foundation</span>
         </div>
-        <div className="ml-auto flex items-center gap-2 text-xs text-zinc-500">
+        <div className="ml-auto flex items-center gap-3 text-xs text-zinc-500">
+          <FPSCounter />
+          <span className="h-4 w-px bg-zinc-700" />
           <VoxelStoreExample />
+          <span className="h-4 w-px bg-zinc-700" />
+          <StressTest />
         </div>
       </header>
       <main className="flex flex-1 flex-col">
