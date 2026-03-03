@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useVoxelStore } from "../store/voxelStore";
-import { BOUNDS_MIN, BOUNDS_MAX } from "../store/voxelStore";
+import { useVoxelStore, BOUNDS_MIN, BOUNDS_MAX, type EditMode } from "../store/voxelStore";
 
 const COLOR_PRESETS = [
   0x88ccff, // Default blue
@@ -25,9 +24,11 @@ const COLOR_PRESETS = [
 export function VoxelToolbar() {
   const tool = useVoxelStore((state) => state.tool);
   const selectedColor = useVoxelStore((state) => state.selectedColor);
+  const editMode = useVoxelStore((state) => state.editMode);
   const activeLayerY = useVoxelStore((state) => state.activeLayerY);
   const setTool = useVoxelStore((state) => state.setTool);
   const setColor = useVoxelStore((state) => state.setColor);
+  const setEditMode = useVoxelStore((state) => state.setEditMode);
   const setActiveLayerY = useVoxelStore((state) => state.setActiveLayerY);
   const incrementLayer = useVoxelStore((state) => state.incrementLayer);
   const decrementLayer = useVoxelStore((state) => state.decrementLayer);
@@ -62,7 +63,7 @@ export function VoxelToolbar() {
   return (
     <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
       <div className="flex items-center gap-2 bg-zinc-900/90 backdrop-blur-sm border border-zinc-800 rounded-lg px-3 py-2 shadow-lg">
-        {/* Pencil Tool */}
+        {/* Edit / Move Tool */}
         <button
           onClick={() => setTool("pencil")}
           className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
@@ -70,7 +71,7 @@ export function VoxelToolbar() {
               ? "bg-blue-600 text-white"
               : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
           }`}
-          title="Pencil tool - Click empty space to create, click voxel to delete"
+          title="Edit tool - Use Add/Delete modes to control behavior"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -118,6 +119,32 @@ export function VoxelToolbar() {
 
         {/* Divider */}
         <div className="h-6 w-px bg-zinc-700 mx-1" />
+
+        {/* Add / Delete Mode */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setEditMode("add")}
+            className={`px-2.5 py-1.5 rounded text-xs font-medium transition-colors ${
+              editMode === "add"
+                ? "bg-emerald-600 text-white"
+                : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+            }`}
+            title="Add mode - Click plane to create voxels on the active layer"
+          >
+            Add
+          </button>
+          <button
+            onClick={() => setEditMode("remove")}
+            className={`px-2.5 py-1.5 rounded text-xs font-medium transition-colors ${
+              editMode === "remove"
+                ? "bg-rose-600 text-white"
+                : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+            }`}
+            title="Delete mode - Click voxels to remove them"
+          >
+            Delete
+          </button>
+        </div>
 
         {/* Layer Slider */}
         <div className="flex items-center gap-2">

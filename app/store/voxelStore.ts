@@ -22,6 +22,8 @@ export type VoxelMap = Map<string, Voxel>;
 
 export type Tool = "pencil" | "move";
 
+export type EditMode = "add" | "remove";
+
 // --- Key utilities ---
 
 export function keyFromXYZ(x: number, y: number, z: number): string {
@@ -39,6 +41,7 @@ interface VoxelState {
   voxels: VoxelMap;
   selectedColor: number;
   tool: Tool;
+  editMode: EditMode;
   activeLayerY: number;
 }
 
@@ -48,6 +51,7 @@ interface VoxelActions {
   removeVoxel: (x: number, y: number, z: number) => void;
   setColor: (color: number) => void;
   setTool: (tool: Tool) => void;
+  setEditMode: (mode: EditMode) => void;
   setActiveLayerY: (y: number) => void;
   incrementLayer: () => void;
   decrementLayer: () => void;
@@ -66,6 +70,7 @@ export const useVoxelStore = create<VoxelState & VoxelActions>((set) => ({
   voxels: createFreshMap(),
   selectedColor: DEFAULT_COLOR,
   tool: "pencil",
+  editMode: "add",
   activeLayerY: 0, // Default to Y=0
 
   addVoxel: (x, y, z, color) => {
@@ -98,6 +103,8 @@ export const useVoxelStore = create<VoxelState & VoxelActions>((set) => ({
   setColor: (color) => set({ selectedColor: color }),
 
   setTool: (tool) => set({ tool }),
+
+  setEditMode: (mode) => set({ editMode: mode }),
 
   setActiveLayerY: (y) => {
     const [minY] = BOUNDS_MIN;

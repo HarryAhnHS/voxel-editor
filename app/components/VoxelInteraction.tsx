@@ -5,7 +5,7 @@ import { useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { useVoxelArray, useMeshRef } from "./VoxelInstances";
 import { useVoxelStore, keyFromXYZ, isWithinBounds } from "../store/voxelStore";
-import { computePlacementCandidate, computePlacementFromEmptySpace } from "../utils/voxelRaycast";
+import { computePlacementCandidate } from "../utils/voxelRaycast";
 import { GhostCube } from "./GhostCube";
 import type { VoxelPosition } from "../store/voxelStore";
 
@@ -24,6 +24,7 @@ export function VoxelInteraction() {
   const voxelArray = useVoxelArray();
   const voxels = useVoxelStore((state) => state.voxels);
   const tool = useVoxelStore((state) => state.tool);
+  const editMode = useVoxelStore((state) => state.editMode);
   const activeLayerY = useVoxelStore((state) => state.activeLayerY);
   const addVoxel = useVoxelStore((state) => state.addVoxel);
   const removeVoxel = useVoxelStore((state) => state.removeVoxel);
@@ -59,54 +60,57 @@ export function VoxelInteraction() {
 
       raycaster.setFromCamera(new THREE.Vector2(x, y), camera);
 
-      // Raycast against instanced mesh first
+      // First try surface-adjacent preview when hovering a voxel (Add mode)
       const meshIntersections = raycaster.intersectObject(mesh, false);
 
-      if (meshIntersections.length > 0) {
-        // Hit a voxel - in pencil mode, show that we can delete
-        // Don't show placement preview when hovering over existing voxel
-        setHoverState({
-          placementPosition: null,
-          isValid: false,
-        });
-      } else {
-        // No voxel hit - show placement preview on active layer plane
-        const workPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -activeLayerY);
-        const intersectionPoint = new THREE.Vector3();
-        const hasIntersection = raycaster.ray.intersectPlane(workPlane, intersectionPoint);
+      if (editMode === "add" && meshIntersections.length > 0) {
+        const intersection = meshIntersections[0];
+        const candidate = computePlacementCandidate(intersection, voxelArray, voxels as any);
 
-        if (hasIntersection) {
-          // Convert intersection point to voxel coordinates on the active layer
-          const x = Math.round(intersectionPoint.x);
-          const z = Math.round(intersectionPoint.z);
-          const y = activeLayerY;
+        if (candidate.isValid && candidate.placementPosition) {
+          setHoverState({
+            placementPosition: candidate.placementPosition,
+            isValid: true,
+          });
+          return;
+        }
+        // Fall through to plane preview if candidate is invalid
+      }
 
-          // Check if position is valid and not occupied
-          const placementPosition: VoxelPosition = [x, y, z];
-          
-          if (isWithinBounds(placementPosition)) {
-            const placementKey = keyFromXYZ(x, y, z);
-            const isOccupied = voxels.has(placementKey);
-            
-            setHoverState({
-              placementPosition: isOccupied ? null : placementPosition,
-              isValid: !isOccupied,
-            });
-          } else {
-            setHoverState({
-              placementPosition: null,
-              isValid: false,
-            });
-          }
+      // Plane placement preview for Add mode: intersect active layer plane
+      const workPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -activeLayerY);
+      const intersectionPoint = new THREE.Vector3();
+      const hasIntersection = raycaster.ray.intersectPlane(workPlane, intersectionPoint);
+
+      if (hasIntersection) {
+        const planeX = Math.round(intersectionPoint.x);
+        const planeZ = Math.round(intersectionPoint.z);
+        const planeY = activeLayerY;
+
+        const placementPosition: VoxelPosition = [planeX, planeY, planeZ];
+
+        if (isWithinBounds(placementPosition)) {
+          const placementKey = keyFromXYZ(planeX, planeY, planeZ);
+          const isOccupied = voxels.has(placementKey);
+
+          setHoverState({
+            placementPosition: isOccupied ? null : placementPosition,
+            isValid: !isOccupied,
+          });
         } else {
           setHoverState({
             placementPosition: null,
             isValid: false,
           });
         }
+      } else {
+        setHoverState({
+          placementPosition: null,
+          isValid: false,
+        });
       }
     },
-    [camera, raycaster, gl.domElement, meshRef, voxels, tool, activeLayerY]
+    [camera, raycaster, gl.domElement, meshRef, voxelArray, voxels, tool, editMode, activeLayerY]
   );
 
   // Set up native DOM event listeners to avoid interfering with orbit controls
@@ -180,36 +184,49 @@ export function VoxelInteraction() {
 
       raycaster.setFromCamera(new THREE.Vector2(x, y), camera);
       const meshIntersections = raycaster.intersectObject(mesh, false);
-
-      if (meshIntersections.length > 0) {
-        // Hit a voxel - in pencil mode, delete it
-        const intersection = meshIntersections[0];
-        const instanceId = intersection.instanceId;
-        if (instanceId !== undefined && instanceId >= 0 && instanceId < voxelArray.length) {
-          const voxel = voxelArray[instanceId];
-          removeVoxel(...voxel.position);
+      
+      if (editMode === "remove") {
+        // Remove mode: raycast instanced mesh and remove clicked voxel
+        if (meshIntersections.length > 0) {
+          const intersection = meshIntersections[0];
+          const instanceId = intersection.instanceId;
+          if (instanceId !== undefined && instanceId >= 0 && instanceId < voxelArray.length) {
+            const voxel = voxelArray[instanceId];
+            removeVoxel(...voxel.position);
+          }
         }
       } else {
-        // No voxel hit - create new voxel on active layer plane
+        // Add mode: prefer adjacent placement when clicking an existing voxel
+        if (meshIntersections.length > 0) {
+          const intersection = meshIntersections[0];
+          const candidate = computePlacementCandidate(intersection, voxelArray, voxels as any);
+
+          if (candidate.isValid && candidate.placementPosition) {
+            const [cx, cy, cz] = candidate.placementPosition;
+            addVoxel(cx, cy, cz);
+            mouseDownPos = null;
+            return;
+          }
+        }
+
+        // Fallback: plane placement on active layer
         const workPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -activeLayerY);
         const intersectionPoint = new THREE.Vector3();
         const hasIntersection = raycaster.ray.intersectPlane(workPlane, intersectionPoint);
 
         if (hasIntersection) {
-          // Convert intersection point to voxel coordinates on the active layer
-          const x = Math.round(intersectionPoint.x);
-          const z = Math.round(intersectionPoint.z);
-          const y = activeLayerY;
+          const planeX = Math.round(intersectionPoint.x);
+          const planeZ = Math.round(intersectionPoint.z);
+          const planeY = activeLayerY;
 
-          // Check if position is valid and not occupied
-          const placementPosition: VoxelPosition = [x, y, z];
-          
+          const placementPosition: VoxelPosition = [planeX, planeY, planeZ];
+
           if (isWithinBounds(placementPosition)) {
-            const placementKey = keyFromXYZ(x, y, z);
+            const placementKey = keyFromXYZ(planeX, planeY, planeZ);
             const isOccupied = voxels.has(placementKey);
-            
+
             if (!isOccupied) {
-              addVoxel(x, y, z);
+              addVoxel(planeX, planeY, planeZ);
             }
           }
         }
@@ -239,11 +256,11 @@ export function VoxelInteraction() {
       canvas.removeEventListener("click", handleClick);
       canvas.removeEventListener("mouseleave", handleMouseLeave);
     };
-  }, [gl.domElement, camera, raycaster, meshRef, voxelArray, voxels, tool, activeLayerY, addVoxel, removeVoxel, updateHover]);
+  }, [gl.domElement, camera, raycaster, meshRef, voxelArray, voxels, tool, editMode, activeLayerY, addVoxel, removeVoxel, updateHover]);
 
   return (
     <>
-      {/* Ghost cube preview - only show in pencil mode when hovering empty space */}
+      {/* Ghost cube preview - only show in pencil mode */}
       {tool === "pencil" && (
         <GhostCube
           position={hoverState.placementPosition}
