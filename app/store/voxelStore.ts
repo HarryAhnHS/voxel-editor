@@ -43,6 +43,7 @@ interface VoxelState {
   tool: Tool;
   editMode: EditMode;
   activeLayerY: number;
+  showLayerAxis: boolean;
 }
 
 interface VoxelActions {
@@ -55,6 +56,7 @@ interface VoxelActions {
   setActiveLayerY: (y: number) => void;
   incrementLayer: () => void;
   decrementLayer: () => void;
+  toggleLayerAxis: () => void;
   clear: () => void;
   /** Applies batch (e.g. from generator); enforces bounds + cap. Returns count applied. */
   applyVoxels: (voxels: Voxel[]) => number;
@@ -72,6 +74,7 @@ export const useVoxelStore = create<VoxelState & VoxelActions>((set) => ({
   tool: "pencil",
   editMode: "add",
   activeLayerY: 0, // Default to Y=0
+   showLayerAxis: true,
 
   addVoxel: (x, y, z, color) => {
     let added = false;
@@ -126,6 +129,11 @@ export const useVoxelStore = create<VoxelState & VoxelActions>((set) => ({
       const newY = Math.max(minY, state.activeLayerY - 1);
       return { activeLayerY: newY };
     }),
+
+  toggleLayerAxis: () =>
+    set((state) => ({
+      showLayerAxis: !state.showLayerAxis,
+    })),
 
   clear: () => set({ voxels: createFreshMap() }),
 

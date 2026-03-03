@@ -21,17 +21,23 @@ const COLOR_PRESETS = [
   0x000000, // Black
 ];
 
-export function VoxelToolbar() {
+interface VoxelToolbarProps {
+  onResetView?: () => void;
+}
+
+export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
   const tool = useVoxelStore((state) => state.tool);
   const selectedColor = useVoxelStore((state) => state.selectedColor);
   const editMode = useVoxelStore((state) => state.editMode);
   const activeLayerY = useVoxelStore((state) => state.activeLayerY);
+  const showLayerAxis = useVoxelStore((state) => state.showLayerAxis);
   const setTool = useVoxelStore((state) => state.setTool);
   const setColor = useVoxelStore((state) => state.setColor);
   const setEditMode = useVoxelStore((state) => state.setEditMode);
   const setActiveLayerY = useVoxelStore((state) => state.setActiveLayerY);
   const incrementLayer = useVoxelStore((state) => state.incrementLayer);
   const decrementLayer = useVoxelStore((state) => state.decrementLayer);
+  const toggleLayerAxis = useVoxelStore((state) => state.toggleLayerAxis);
 
   // Keyboard shortcuts for layer navigation
   useEffect(() => {
@@ -117,6 +123,29 @@ export function VoxelToolbar() {
           Move
         </button>
 
+        {/* Reset view */}
+        <button
+          onClick={() => onResetView?.()}
+          className="px-2.5 py-1.5 rounded text-xs font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors"
+          title="Reset camera to center (R)"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-4 w-4 inline-block mr-1.5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 3v4m0 10v4m9-9h-4M7 12H3m13.657-6.657L15 8m-6 8-1.657 2.657M8.343 5.343 10 8m6 8 1.657 2.657"
+            />
+          </svg>
+          Reset View
+        </button>
+
         {/* Divider */}
         <div className="h-6 w-px bg-zinc-700 mx-1" />
 
@@ -147,38 +176,68 @@ export function VoxelToolbar() {
         </div>
 
         {/* Layer Slider */}
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-zinc-400 whitespace-nowrap">
-            Layer Y:
-          </label>
+        <div className="flex items-center gap-3">
+          {/* Layer Slider */}
           <div className="flex items-center gap-2">
-            <button
-              onClick={decrementLayer}
-              className="px-2 py-1 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 rounded text-sm"
-              title="Decrement layer ([ key)"
-            >
-              −
-            </button>
-            <input
-              type="range"
-              min={minY}
-              max={maxY}
-              value={activeLayerY}
-              onChange={(e) => setActiveLayerY(Number(e.target.value))}
-              className="w-24 h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer slider"
-              title={`Layer Y: ${activeLayerY}`}
-            />
-            <button
-              onClick={incrementLayer}
-              className="px-2 py-1 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 rounded text-sm"
-              title="Increment layer (] key)"
-            >
-              +
-            </button>
-            <span className="text-xs text-zinc-300 w-8 text-center">
-              {activeLayerY}
-            </span>
+            <label className="text-xs text-zinc-400 whitespace-nowrap">
+              Layer Y:
+            </label>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={decrementLayer}
+                className="px-2 py-1 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 rounded text-sm"
+                title="Decrement layer ([ key)"
+              >
+                −
+              </button>
+              <input
+                type="range"
+                min={minY}
+                max={maxY}
+                value={activeLayerY}
+                onChange={(e) => setActiveLayerY(Number(e.target.value))}
+                className="w-24 h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer slider"
+                title={`Layer Y: ${activeLayerY}`}
+              />
+              <button
+                onClick={incrementLayer}
+                className="px-2 py-1 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 rounded text-sm"
+                title="Increment layer (] key)"
+              >
+                +
+              </button>
+              <span className="text-xs text-zinc-300 w-8 text-center">
+                {activeLayerY}
+              </span>
+            </div>
           </div>
+
+          {/* Layer Axis Toggle */}
+          <button
+            onClick={toggleLayerAxis}
+            className={`px-2.5 py-1.5 rounded text-xs font-medium transition-colors flex items-center gap-1 ${
+              showLayerAxis
+                ? "bg-zinc-200 text-zinc-900"
+                : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+            }`}
+            title="Toggle active layer grid visibility"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-3.5 w-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 6h16M4 10h16M4 14h16M4 18h16"
+              />
+            </svg>
+            <span>Grid</span>
+          </button>
         </div>
 
         {/* Divider */}
