@@ -9,15 +9,19 @@ This editor prioritizes:
 - Performance stability (1000+ voxels)
 - Minimal but professional UI
 - Full placement freedom (no adjacency required)
+- Fast sculpting on existing geometry
 
 The system separates:
 
 1) Camera navigation
 2) Editing mode (Add / Remove)
-3) Placement mode (Plane / Surface)
-4) Layer selection (Y slice)
+3) Layer selection (Y slice)
 
-This prevents ambiguity and keeps behavior consistent.
+Placement behavior is unified under a single hybrid model:
+- If cursor is over a voxel, treat that as the primary target (surface behavior).
+- If cursor is not over any voxel, fall back to the active layer plane.
+
+This prevents ambiguity while keeping the editor fast to use.
 
 ---
 
@@ -47,59 +51,91 @@ The camera is always active. Editing tools do not disable navigation.
 Editing behavior depends on:
 
 - ToolMode: Add | Remove
-- PlacementMode: Plane | Surface
 - ActiveLayerY (integer)
+
+Placement is hybrid and does not require a separate placement mode.
 
 ---
 
-## 4. Placement Modes
+## 4. Hybrid Placement System
 
-### 4.1 Plane Placement (Primary Mode)
+### 4.1 Always-on Work Plane
 
-This mode allows full freedom — voxels can be added anywhere.
+A work plane exists at Y = ActiveLayerY.
 
-Mechanism:
-- A work plane exists at Y = ActiveLayerY
 - Plane is rendered visually (grid)
-- An invisible mesh handles pointer raycasts
+- An invisible plane mesh handles pointer raycasts
+- Plane provides full placement freedom when cursor is not over a voxel
 
-When clicking in Add mode:
-1. Raycast against plane
-2. Convert hit point to voxel coordinates:
+This plane is always available and acts as the reference for empty-space placement.
+
+---
+
+### 4.2 Voxel Surface Targeting (Primary When Available)
+
+The voxel instanced mesh is also raycastable.
+
+If the cursor is over an existing voxel:
+- You can remove the hovered voxel immediately (Remove tool)
+- You can add adjacent voxels by using the face normal (Add tool)
+- Hovering should make adjacent placement feel effortless
+
+This enables fast sculpting without needing to switch modes.
+
+---
+
+### 4.3 Hit Selection and Precedence
+
+On hover and click, compute two raycasts:
+
+1) Raycast against the instanced voxel mesh
+2) Raycast against the work plane
+
+Choose the active target using this rule:
+
+- If voxel hit exists, use voxel hit (primary)
+- Else if plane hit exists, use plane hit (fallback)
+- Else no-op
+
+Rationale:
+- When geometry exists under the cursor, user intent is usually sculpting.
+- When nothing exists under the cursor, user intent is free placement on the active layer.
+
+This keeps behavior consistent and learnable.
+
+---
+
+### 4.4 Add Tool Behavior
+
+When ToolMode = Add:
+
+Case A: Cursor over voxel (voxel hit)
+1. Get instanceId
+2. Get voxel coordinate V = (vx, vy, vz)
+3. Compute adjacent coordinate A = V + faceNormal (rounded to integer axis)
+4. If A is empty, add voxel at A using active color
+
+Case B: Cursor not over voxel (plane hit only)
+1. Compute coordinate P:
    - x = round(hit.x)
    - z = round(hit.z)
    - y = ActiveLayerY
-3. If cell is empty → add voxel
-
-Remove mode:
-- Raycast instanced mesh
-- Remove voxel at instanceId position
-
-Advantages:
-- Can place isolated voxels
-- Clear mental model
-- Works across layers
-- Simple implementation
-
-This is the default placement mode.
+2. If P is empty, add voxel at P using active color
 
 ---
 
-### 4.2 Surface Placement (Secondary Mode)
+### 4.5 Remove Tool Behavior
 
-Used for sculpting existing geometry.
+When ToolMode = Remove:
 
-Add mode:
-1. Raycast instanced mesh
-2. Get instanceId
-3. Compute adjacent coordinate using face normal
-4. Add voxel at adjacent position
+Case A: Cursor over voxel (voxel hit)
+- Remove voxel at instanceId position
 
-Remove mode:
-- Raycast instanced mesh
-- Remove clicked voxel
+Case B: Cursor not over voxel (plane hit only)
+- No-op (optional: allow remove on plane by deleting the voxel at that plane cell if present, but only if it does not add ambiguity)
 
-Surface mode only works when clicking existing voxels.
+Recommended for predictability:
+- Remove only acts on voxel hits.
 
 ---
 
@@ -114,12 +150,15 @@ Controls:
 
 Visual behavior:
 - Grid moves to ActiveLayerY
-- Optional: fade voxels not on active layer (if time permits)
 - Display current layer in UI
 
 Layer bounds:
-- Example: [-20, 20] or [0, 30]
+- Example: [-20, 20]
 - Clamped to prevent extreme ranges
+
+Optional (if time permits):
+- Visual de-emphasis of voxels far from ActiveLayerY (simple opacity or fog-like fade)
+- This must not require rebuilding instance buffers, only a shader/material adjustment if attempted.
 
 ---
 
@@ -127,13 +166,14 @@ Layer bounds:
 
 Hover preview must not trigger full instanced mesh rebuild.
 
-Behavior:
+Hover preview follows the same precedence rule:
 
-Plane mode:
-- Ghost cube appears at computed (x, ActiveLayerY, z)
-
-Surface mode:
-- Ghost cube appears at adjacent position using face normal
+- If voxel hit exists:
+  - Show ghost cube at adjacent coordinate A (Add tool)
+  - Show highlight on hovered voxel (Remove tool)
+- Else if plane hit exists:
+  - Show ghost cube at plane coordinate P (Add tool)
+  - No preview for Remove tool (recommended)
 
 Implementation rule:
 - Ghost cube is a separate mesh
@@ -144,12 +184,11 @@ Implementation rule:
 
 ## 7. UI Layout
 
-### Option A: Top Toolbar (Recommended)
+### Top Toolbar (Recommended)
 
 Top bar contains:
 
 - Tool Toggle: Add | Remove
-- Placement Toggle: Plane | Surface
 - Layer Slider (Y)
 - Color Palette (8–12 colors)
 - Clear Button
@@ -160,6 +199,9 @@ Minimal Tailwind styling:
 - Fixed top
 - Dark translucent background
 - Compact spacing
+
+Note:
+PlacementMode toggle is removed in this hybrid design to reduce UI complexity.
 
 ---
 
@@ -181,6 +223,10 @@ Ctrl+Shift+Z → Redo (if implemented)
 - Rebuild instance matrices only when voxelMap changes
 - Hover state must not rebuild instance buffers
 - Layer change must not reallocate voxel storage
+- Raycasts should be lightweight:
+  - Only raycast on pointer move and pointer down
+  - Keep hover state local
+  - Avoid expensive allocations inside pointer handlers
 
 Target:
 - Smooth interaction at 1000+ voxels
@@ -189,11 +235,16 @@ Target:
 
 ## 10. Edge Cases to Handle
 
-- Clicking empty space in Surface mode → no-op
-- Attempting to add voxel in occupied cell → no-op
-- Clicking below/above plane → no placement
-- Rapid clicking → no duplicate entries
-- Large scenes → stable performance
+- Cursor over voxel and plane simultaneously:
+  - Voxel always wins
+- Attempting to add voxel in occupied cell:
+  - No-op
+- Clicking empty space (plane hit) in Remove mode:
+  - No-op
+- Rapid clicking:
+  - No duplicate entries, stable performance
+- Large scenes:
+  - Stable interaction, no major hitches
 
 ---
 
@@ -206,6 +257,7 @@ Keep it clean:
 - Soft lighting
 - Distinct ghost cube (semi-transparent)
 - Clear active color highlight
+- Clear tool mode indicator
 
 Avoid:
 - Overdesigned UI
@@ -231,8 +283,8 @@ The UI must satisfy:
 - Smooth navigation
 - Clear tool state
 - 1000+ voxel performance
-- Full placement freedom
-- Predictable layer behavior
-- Intuitive add/remove
+- Full placement freedom via active layer plane
+- Fast sculpting via voxel-first targeting
+- Predictable precedence rules
 
 If a behavior feels ambiguous, adjust toward predictability.

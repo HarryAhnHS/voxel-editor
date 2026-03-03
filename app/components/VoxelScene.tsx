@@ -34,7 +34,6 @@ function SceneContents() {
         shadow-mapSize-height={1024}
       />
       <hemisphereLight
-        skyColor={0xb1e1ff}
         groundColor={0x111111}
         intensity={0.4}
       />
