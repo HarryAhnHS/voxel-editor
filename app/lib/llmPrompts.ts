@@ -1,3 +1,4 @@
+import { BOUNDS_MIN, BOUNDS_MAX } from "@/app/store/voxelConstraints";
 import {
   VOXEL_SPEC_MAX_DIMENSION,
   VOXEL_SPEC_MAX_VOXELS,
@@ -16,6 +17,7 @@ CRITICAL RULES:
 1. Output ONLY valid JSON. No markdown, no code fences, no explanations.
 2. The JSON must match the VoxelSpec schema exactly.
 3. Respect these hard limits:
+   - World coordinates: each axis is in range [${BOUNDS_MIN[0]}, ${BOUNDS_MAX[0]}]. So bounds.origin + bounds.size - 1 must be ≤ ${BOUNDS_MAX[0]} on each axis (e.g. origin (0,0,0) allows at most size (20,20,20); use origin (${BOUNDS_MIN[0]},0,${BOUNDS_MIN[2]}) with size (40,10,40) to span the full space for a bridge).
    - Maximum bounds dimension: ${VOXEL_SPEC_MAX_DIMENSION} per axis
    - Maximum voxel count estimate: ${VOXEL_SPEC_MAX_VOXELS}
    - Maximum commands: 1024
@@ -97,6 +99,7 @@ SHAPE DESIGN GUIDELINES:
 - Use "cylinder" for pillars, towers, and rounded columns.
 - Use "floor" for ground planes, platforms, or interior floors.
 - Use "line" for details like beams, rails, antennas, or decorative edges.
+- For bridges or long spans: use bounds that span the full world (e.g. origin (${BOUNDS_MIN[0]},0,${BOUNDS_MIN[2]}) with size (40,10,10) for a long bridge along X).
 - Aim for variation in height and silhouette (not just a single solid cube).
 - Keep everything strictly within bounds and under the voxel cap.
 

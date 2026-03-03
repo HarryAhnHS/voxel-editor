@@ -17,6 +17,7 @@ function SceneContents() {
   const meshRef = useRef<THREE.InstancedMesh | null>(null);
   const activeLayerY = useVoxelStore((state) => state.activeLayerY);
   const showLayerAxis = useVoxelStore((state) => state.showLayerAxis);
+  const planeAxis = useVoxelStore((state) => state.planeAxis);
   const gridConfig = useMemo(
     () => ({
       size: 40,
@@ -25,6 +26,39 @@ function SceneContents() {
       colorGrid: 0x333333,
     }),
     []
+  );
+
+  const gridPosition = useMemo<[number, number, number]>(
+    () => {
+      switch (planeAxis) {
+        case "x":
+          return [activeLayerY, 0, 0];
+        case "z":
+          return [0, 0, activeLayerY];
+        case "y":
+        default:
+          return [0, activeLayerY, 0];
+      }
+    },
+    [planeAxis, activeLayerY]
+  );
+
+  const gridRotation = useMemo<[number, number, number]>(
+    () => {
+      switch (planeAxis) {
+        case "x":
+          // YZ plane: rotate grid (initially XZ) 90° around Z
+          return [0, 0, Math.PI / 2];
+        case "z":
+          // XY plane: rotate grid 90° around X
+          return [Math.PI / 2, 0, 0];
+        case "y":
+        default:
+          // XZ plane at constant Y
+          return [0, 0, 0];
+      }
+    },
+    [planeAxis]
   );
 
   return (
@@ -47,7 +81,8 @@ function SceneContents() {
       {/* eslint-disable-next-line react/no-unknown-property */}
       {showLayerAxis && (
         <gridHelper
-          position={[0, activeLayerY, 0]}
+          position={gridPosition}
+          rotation={gridRotation}
           args={[
             gridConfig.size,
             gridConfig.divisions,

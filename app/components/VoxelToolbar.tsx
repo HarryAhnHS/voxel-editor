@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Pencil, Move3D, Layers, RefreshCw, Trash2, Wrench } from "lucide-react";
-import { useVoxelStore, BOUNDS_MIN, BOUNDS_MAX } from "../store/voxelStore";
+import { useVoxelStore, BOUNDS_MIN, BOUNDS_MAX, type PlaneAxis } from "../store/voxelStore";
 import { Button } from "./ui/button";
 import {
   Popover,
@@ -47,6 +47,7 @@ export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
   const activeLayerY = useVoxelStore((state) => state.activeLayerY);
   const showLayerAxis = useVoxelStore((state) => state.showLayerAxis);
   const showDevTools = useVoxelStore((state) => state.showDevTools);
+  const planeAxis = useVoxelStore((state) => state.planeAxis);
   const setTool = useVoxelStore((state) => state.setTool);
   const setColor = useVoxelStore((state) => state.setColor);
   const setEditMode = useVoxelStore((state) => state.setEditMode);
@@ -56,6 +57,7 @@ export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
   const toggleLayerAxis = useVoxelStore((state) => state.toggleLayerAxis);
   const toggleDevTools = useVoxelStore((state) => state.toggleDevTools);
   const clear = useVoxelStore((state) => state.clear);
+  const setPlaneAxis = useVoxelStore((state) => state.setPlaneAxis);
 
   const [colorOpen, setColorOpen] = useState(false);
 
@@ -201,7 +203,11 @@ export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
                   </div>
                   <div className="mb-2 flex items-center justify-between gap-2">
                     <span className="text-[11px] text-zinc-400">
-                      Layer Y:{" "}
+                      Plane:{" "}
+                      <span className="font-semibold text-zinc-200 uppercase">
+                        {planeAxis}
+                      </span>{" "}
+                      · Layer:{" "}
                       <span className="font-semibold text-zinc-200">
                         {activeLayerY}
                       </span>
@@ -209,17 +215,24 @@ export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
                     <div className="flex items-center gap-1.5">
                       <Button
                         size="sm"
-                        variant="subtle"
-                        onClick={decrementLayer}
+                        variant={planeAxis === "x" ? "primary" : "subtle"}
+                        onClick={() => setPlaneAxis("x")}
                       >
-                        −
+                        X
                       </Button>
                       <Button
                         size="sm"
-                        variant="subtle"
-                        onClick={incrementLayer}
+                        variant={planeAxis === "y" ? "primary" : "subtle"}
+                        onClick={() => setPlaneAxis("y")}
                       >
-                        +
+                        Y
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={planeAxis === "z" ? "primary" : "subtle"}
+                        onClick={() => setPlaneAxis("z")}
+                      >
+                        Z
                       </Button>
                     </div>
                   </div>

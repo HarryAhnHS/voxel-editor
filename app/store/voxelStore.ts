@@ -24,6 +24,8 @@ export type Tool = "pencil" | "move";
 
 export type EditMode = "add" | "remove";
 
+export type PlaneAxis = "x" | "y" | "z";
+
 // --- Key utilities ---
 
 export function keyFromXYZ(x: number, y: number, z: number): string {
@@ -45,6 +47,7 @@ interface VoxelState {
   activeLayerY: number;
   showLayerAxis: boolean;
   showDevTools: boolean;
+  planeAxis: PlaneAxis;
 }
 
 interface VoxelActions {
@@ -54,6 +57,7 @@ interface VoxelActions {
   setColor: (color: number) => void;
   setTool: (tool: Tool) => void;
   setEditMode: (mode: EditMode) => void;
+  setPlaneAxis: (axis: PlaneAxis) => void;
   setActiveLayerY: (y: number) => void;
   incrementLayer: () => void;
   decrementLayer: () => void;
@@ -75,9 +79,10 @@ export const useVoxelStore = create<VoxelState & VoxelActions>((set) => ({
   selectedColor: DEFAULT_COLOR,
   tool: "pencil",
   editMode: "add",
-  activeLayerY: 0, // Default to Y=0
+  activeLayerY: 0, // Default plane coordinate
   showLayerAxis: true,
   showDevTools: true,
+  planeAxis: "y",
 
   addVoxel: (x, y, z, color) => {
     let added = false;
@@ -111,6 +116,8 @@ export const useVoxelStore = create<VoxelState & VoxelActions>((set) => ({
   setTool: (tool) => set({ tool }),
 
   setEditMode: (mode) => set({ editMode: mode }),
+
+  setPlaneAxis: (axis) => set({ planeAxis: axis }),
 
   setActiveLayerY: (y) => {
     const [minY] = BOUNDS_MIN;

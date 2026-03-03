@@ -18,15 +18,15 @@ export const BOUNDS_MIN: VoxelPosition = [
   -BOUNDS_HALF,
 ];
 
-/** Inclusive max position [49, 49, 49] (centered around origin). */
+/** Inclusive max position [19, 19, 19] (centered around origin). */
 export const BOUNDS_MAX: VoxelPosition = [
   BOUNDS_HALF - 1,
   BOUNDS_HALF - 1,
   BOUNDS_HALF - 1,
 ];
 
-/** Hard cap on total voxel count (SPEC: "Maximum voxel count"). */
-export const MAX_VOXEL_COUNT = 2000;
+/** Hard cap on total voxel count (SPEC: "Maximum voxel count"). 40³=64k cells; 8k allows ~12% fill. */
+export const MAX_VOXEL_COUNT = 8000;
 
 export function isWithinBounds([x, y, z]: VoxelPosition): boolean {
   const [minX, minY, minZ] = BOUNDS_MIN;

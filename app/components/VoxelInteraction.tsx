@@ -26,6 +26,7 @@ export function VoxelInteraction() {
   const tool = useVoxelStore((state) => state.tool);
   const editMode = useVoxelStore((state) => state.editMode);
   const activeLayerY = useVoxelStore((state) => state.activeLayerY);
+  const planeAxis = useVoxelStore((state) => state.planeAxis);
   const selectedColor = useVoxelStore((state) => state.selectedColor);
   const addVoxel = useVoxelStore((state) => state.addVoxel);
   const removeVoxel = useVoxelStore((state) => state.removeVoxel);
@@ -124,19 +125,44 @@ export function VoxelInteraction() {
       }
 
       // Plane placement preview for Add mode: intersect active layer plane
-      const workPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -activeLayerY);
+      const normal =
+        planeAxis === "x"
+          ? new THREE.Vector3(1, 0, 0)
+          : planeAxis === "z"
+          ? new THREE.Vector3(0, 0, 1)
+          : new THREE.Vector3(0, 1, 0);
+      const workPlane = new THREE.Plane(normal, -activeLayerY);
       const intersectionPoint = new THREE.Vector3();
       const hasIntersection = raycaster.ray.intersectPlane(workPlane, intersectionPoint);
 
       if (hasIntersection) {
-        const planeX = Math.round(intersectionPoint.x);
-        const planeZ = Math.round(intersectionPoint.z);
-        const planeY = activeLayerY;
+        let px: number;
+        let py: number;
+        let pz: number;
 
-        const placementPosition: VoxelPosition = [planeX, planeY, planeZ];
+        switch (planeAxis) {
+          case "x":
+            px = activeLayerY;
+            py = Math.round(intersectionPoint.y);
+            pz = Math.round(intersectionPoint.z);
+            break;
+          case "z":
+            px = Math.round(intersectionPoint.x);
+            py = Math.round(intersectionPoint.y);
+            pz = activeLayerY;
+            break;
+          case "y":
+          default:
+            px = Math.round(intersectionPoint.x);
+            py = activeLayerY;
+            pz = Math.round(intersectionPoint.z);
+            break;
+        }
+
+        const placementPosition: VoxelPosition = [px, py, pz];
 
         if (isWithinBounds(placementPosition)) {
-          const placementKey = keyFromXYZ(planeX, planeY, planeZ);
+          const placementKey = keyFromXYZ(px, py, pz);
           const isOccupied = voxels.has(placementKey);
 
           setHoverState({
@@ -156,7 +182,7 @@ export function VoxelInteraction() {
         });
       }
     },
-    [camera, raycaster, gl.domElement, meshRef, voxelArray, voxels, tool, editMode, activeLayerY]
+    [camera, raycaster, gl.domElement, meshRef, voxelArray, voxels, tool, editMode, planeAxis, activeLayerY]
   );
 
   // Set up native DOM event listeners to avoid interfering with orbit controls
@@ -255,23 +281,48 @@ export function VoxelInteraction() {
         }
 
         // Fallback: plane placement on active layer
-        const workPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -activeLayerY);
+        const normal =
+          planeAxis === "x"
+            ? new THREE.Vector3(1, 0, 0)
+            : planeAxis === "z"
+            ? new THREE.Vector3(0, 0, 1)
+            : new THREE.Vector3(0, 1, 0);
+        const workPlane = new THREE.Plane(normal, -activeLayerY);
         const intersectionPoint = new THREE.Vector3();
         const hasIntersection = raycaster.ray.intersectPlane(workPlane, intersectionPoint);
 
         if (hasIntersection) {
-          const planeX = Math.round(intersectionPoint.x);
-          const planeZ = Math.round(intersectionPoint.z);
-          const planeY = activeLayerY;
+          let px: number;
+          let py: number;
+          let pz: number;
 
-          const placementPosition: VoxelPosition = [planeX, planeY, planeZ];
+          switch (planeAxis) {
+            case "x":
+              px = activeLayerY;
+              py = Math.round(intersectionPoint.y);
+              pz = Math.round(intersectionPoint.z);
+              break;
+            case "z":
+              px = Math.round(intersectionPoint.x);
+              py = Math.round(intersectionPoint.y);
+              pz = activeLayerY;
+              break;
+            case "y":
+            default:
+              px = Math.round(intersectionPoint.x);
+              py = activeLayerY;
+              pz = Math.round(intersectionPoint.z);
+              break;
+          }
+
+          const placementPosition: VoxelPosition = [px, py, pz];
 
           if (isWithinBounds(placementPosition)) {
-            const placementKey = keyFromXYZ(planeX, planeY, planeZ);
+            const placementKey = keyFromXYZ(px, py, pz);
             const isOccupied = voxels.has(placementKey);
 
             if (!isOccupied) {
-              addVoxel(planeX, planeY, planeZ);
+              addVoxel(px, py, pz);
             }
           }
         }

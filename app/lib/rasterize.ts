@@ -125,6 +125,11 @@ export function clampBounds(
     );
   }
 
+  console.log("[clampBounds]", {
+    specBounds: spec.bounds,
+    clampedBounds,
+    maxVoxels: hardCap,
+  });
   return { bounds: clampedBounds, maxVoxels: hardCap };
 }
 
@@ -331,7 +336,10 @@ export function rasterize(
 
   const voxelMap = new Map<string, RasterizedVoxel>();
 
-  for (const cmd of spec.commands as VoxelCommand[]) {
+  const boundsMinMax = boundsWorldMinMax(bounds);
+  for (let i = 0; i < spec.commands.length; i++) {
+    const cmd = spec.commands[i] as VoxelCommand;
+    console.log("[rasterize] command", i, cmd.op, "bounds", boundsMinMax);
     const voxels = rasterizeCommand(spec, cmd, bounds);
     for (const v of voxels) {
       const key = `${v.x},${v.y},${v.z}`;
