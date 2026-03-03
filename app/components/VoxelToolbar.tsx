@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Pencil, Move3D, Layers, RefreshCw, Trash2, Wrench } from "lucide-react";
 import { useVoxelStore, BOUNDS_MIN, BOUNDS_MAX } from "../store/voxelStore";
 import { Button } from "./ui/button";
@@ -56,6 +56,8 @@ export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
   const toggleDevTools = useVoxelStore((state) => state.toggleDevTools);
   const clear = useVoxelStore((state) => state.clear);
 
+  const [colorOpen, setColorOpen] = useState(false);
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (
@@ -65,18 +67,57 @@ export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
         return;
       }
 
-      if (event.key === "[") {
-        event.preventDefault();
-        decrementLayer();
-      } else if (event.key === "]") {
-        event.preventDefault();
-        incrementLayer();
+      switch (event.key) {
+        case "a":
+        case "A": {
+          event.preventDefault();
+          setTool("pencil");
+          setEditMode("add");
+          break;
+        }
+        case "d":
+        case "D": {
+          event.preventDefault();
+          setTool("pencil");
+          setEditMode("remove");
+          break;
+        }
+        case "m":
+        case "M": {
+          event.preventDefault();
+          setTool("move");
+          break;
+        }
+        case "ArrowUp": {
+          event.preventDefault();
+          incrementLayer();
+          break;
+        }
+        case "ArrowDown": {
+          event.preventDefault();
+          decrementLayer();
+          break;
+        }
+        case "h":
+        case "H": {
+          event.preventDefault();
+          toggleLayerAxis();
+          break;
+        }
+        case "c":
+        case "C": {
+          event.preventDefault();
+          setColorOpen((open) => !open);
+          break;
+        }
+        default:
+          break;
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [incrementLayer, decrementLayer]);
+  }, [setTool, setEditMode, incrementLayer, decrementLayer, toggleLayerAxis]);
 
   const [minY] = BOUNDS_MIN;
   const [maxY] = BOUNDS_MAX;
@@ -102,7 +143,7 @@ export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
                 <Pencil className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Add</TooltipContent>
+            <TooltipContent>Add (A)</TooltipContent>
           </Tooltip>
 
           <Tooltip>
@@ -121,7 +162,7 @@ export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
                 <Pencil className="h-4 w-4 rotate-180" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Remove</TooltipContent>
+            <TooltipContent>Remove (D)</TooltipContent>
           </Tooltip>
 
           <Tooltip>
@@ -135,7 +176,7 @@ export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
                 <Move3D className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Move camera</TooltipContent>
+            <TooltipContent>Move camera (M)</TooltipContent>
           </Tooltip>
 
           <Separator />
@@ -204,13 +245,13 @@ export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
                 </PopoverContent>
               </Popover>
             </TooltipTrigger>
-            <TooltipContent>Reference plane</TooltipContent>
+            <TooltipContent>Reference plane (↑ / ↓, H)</TooltipContent>
           </Tooltip>
 
           {/* Color */}
           <Tooltip>
             <TooltipTrigger asChild>
-              <Popover>
+              <Popover open={colorOpen} onOpenChange={setColorOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="ghost"
@@ -259,7 +300,7 @@ export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
                 </PopoverContent>
               </Popover>
             </TooltipTrigger>
-            <TooltipContent>Color</TooltipContent>
+            <TooltipContent>Color (C)</TooltipContent>
           </Tooltip>
 
           <Separator />
