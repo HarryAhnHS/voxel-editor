@@ -115,8 +115,8 @@ export function VoxelScene() {
           dampingFactor={0.08}
           minDistance={4}
           maxDistance={60}
-          maxPolarAngle={Math.PI * 0.495}
-          screenSpacePanning={false}
+          maxPolarAngle={360}
+          screenSpacePanning={true}
         />
       </Canvas>
     </div>
