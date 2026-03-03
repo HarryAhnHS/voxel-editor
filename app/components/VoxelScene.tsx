@@ -8,6 +8,10 @@ import { VoxelInstances, MeshRefContext } from "./VoxelInstances";
 import { VoxelInteraction } from "./VoxelInteraction";
 import { VoxelToolbar } from "./VoxelToolbar";
 import { useVoxelStore } from "../store/voxelStore";
+import { FPSCounter } from "./FPSCounter";
+import { VoxelStoreExample } from "./VoxelStoreExample";
+import { StressTest } from "./StressTest";
+import { Separator } from "./ui/separator";
 
 function SceneContents() {
   const meshRef = useRef<THREE.InstancedMesh | null>(null);
@@ -64,6 +68,7 @@ function SceneContents() {
 
 export function VoxelScene() {
   const controlsRef = useRef<any>(null);
+  const showDevTools = useVoxelStore((state) => state.showDevTools);
 
   const handleResetView = useCallback(() => {
     const controls = controlsRef.current;
@@ -99,7 +104,20 @@ export function VoxelScene() {
     <div className="absolute inset-0 bg-neutral-950">
       {/* Toolbar */}
       <VoxelToolbar onResetView={handleResetView} />
-      
+
+      {/* Developer tools overlay */}
+      {showDevTools && (
+        <div className="pointer-events-none absolute top-4 right-4 z-10">
+          <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-zinc-800 bg-zinc-950/70 px-3 py-1.5 text-xs text-zinc-300 shadow-lg backdrop-blur-sm">
+            <FPSCounter />
+            <Separator />
+            <VoxelStoreExample />
+            <Separator />
+            <StressTest />
+          </div>
+        </div>
+      )}
+
       <Canvas
         camera={{ position: [10, 10, 10], fov: 45, near: 0.1, far: 1000 }}
         dpr={[1, 2]}
