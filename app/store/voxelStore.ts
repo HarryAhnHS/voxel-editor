@@ -5,6 +5,8 @@ import {
   clampPosition,
   isWithinBounds,
   MAX_VOXEL_COUNT,
+  BOUNDS_MIN,
+  BOUNDS_MAX,
 } from "./voxelConstraints";
 
 // --- Types (aligned with ARCHITECTURE.md) ---
@@ -18,7 +20,7 @@ export interface Voxel {
 
 export type VoxelMap = Map<string, Voxel>;
 
-export type Tool = "add" | "remove";
+export type Tool = "pencil" | "move";
 
 // --- Key utilities ---
 
@@ -37,15 +39,18 @@ interface VoxelState {
   voxels: VoxelMap;
   selectedColor: number;
   tool: Tool;
+  activeLayerY: number;
 }
 
 interface VoxelActions {
   /** Returns true if voxel was added; false if out of bounds or at cap. */
   addVoxel: (x: number, y: number, z: number, color?: number) => boolean;
-  /** Returns the removed voxel, or null if none at that position. (Enables undo.) */
-  removeVoxel: (x: number, y: number, z: number) => Voxel | null;
+  removeVoxel: (x: number, y: number, z: number) => void;
   setColor: (color: number) => void;
   setTool: (tool: Tool) => void;
+  setActiveLayerY: (y: number) => void;
+  incrementLayer: () => void;
+  decrementLayer: () => void;
   clear: () => void;
   /** Applies batch (e.g. from generator); enforces bounds + cap. Returns count applied. */
   applyVoxels: (voxels: Voxel[]) => number;
@@ -60,7 +65,8 @@ function createFreshMap(): VoxelMap {
 export const useVoxelStore = create<VoxelState & VoxelActions>((set) => ({
   voxels: createFreshMap(),
   selectedColor: DEFAULT_COLOR,
-  tool: "add",
+  tool: "pencil",
+  activeLayerY: 0, // Default to Y=0
 
   addVoxel: (x, y, z, color) => {
     let added = false;
@@ -80,23 +86,39 @@ export const useVoxelStore = create<VoxelState & VoxelActions>((set) => ({
     return added;
   },
 
-  removeVoxel: (x, y, z) => {
-    let removed: Voxel | null = null;
+  removeVoxel: (x, y, z) =>
     set((state) => {
       const key = keyFromXYZ(x, y, z);
-      const existing = state.voxels.get(key);
-      if (!existing) return state;
-      removed = existing;
+      if (!state.voxels.has(key)) return state;
       const next = new Map(state.voxels);
       next.delete(key);
       return { voxels: next };
-    });
-    return removed;
-  },
+    }),
 
   setColor: (color) => set({ selectedColor: color }),
 
   setTool: (tool) => set({ tool }),
+
+  setActiveLayerY: (y) => {
+    const [minY] = BOUNDS_MIN;
+    const [maxY] = BOUNDS_MAX;
+    const clampedY = Math.max(minY, Math.min(maxY, Math.round(y)));
+    set({ activeLayerY: clampedY });
+  },
+
+  incrementLayer: () =>
+    set((state) => {
+      const [maxY] = BOUNDS_MAX;
+      const newY = Math.min(maxY, state.activeLayerY + 1);
+      return { activeLayerY: newY };
+    }),
+
+  decrementLayer: () =>
+    set((state) => {
+      const [minY] = BOUNDS_MIN;
+      const newY = Math.max(minY, state.activeLayerY - 1);
+      return { activeLayerY: newY };
+    }),
 
   clear: () => set({ voxels: createFreshMap() }),
 
@@ -141,7 +163,7 @@ export {
 //
 // addVoxel(0, 0, 0);                    // uses selectedColor
 // addVoxel(1, 0, 0, 0xff0000);          // explicit color
-// const removed = removeVoxel(0, 0, 0);  // Voxel | null for undo
+// removeVoxel(0, 0, 0);
 // setColor(0x00ff00);
 // setTool("remove");
 // clear();

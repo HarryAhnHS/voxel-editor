@@ -5,17 +5,24 @@
 
 import type { VoxelPosition } from "./voxelStore";
 
-/** Max extent per axis (e.g. 0..99 = 100 units). */
-export const BOUNDS_SIZE = 100;
+/** Max extent per axis (100 units total, centered around origin). */
+export const BOUNDS_SIZE = 40;
 
-/** Inclusive min position [0, 0, 0]. */
-export const BOUNDS_MIN: VoxelPosition = [0, 0, 0];
+/** Half-size for centering bounds around origin. */
+const BOUNDS_HALF = Math.floor(BOUNDS_SIZE / 2);
 
-/** Inclusive max position [BOUNDS_SIZE-1, BOUNDS_SIZE-1, BOUNDS_SIZE-1]. */
+/** Inclusive min position [-50, -50, -50] (centered around origin). */
+export const BOUNDS_MIN: VoxelPosition = [
+  -BOUNDS_HALF,
+  -BOUNDS_HALF,
+  -BOUNDS_HALF,
+];
+
+/** Inclusive max position [49, 49, 49] (centered around origin). */
 export const BOUNDS_MAX: VoxelPosition = [
-  BOUNDS_SIZE - 1,
-  BOUNDS_SIZE - 1,
-  BOUNDS_SIZE - 1,
+  BOUNDS_HALF - 1,
+  BOUNDS_HALF - 1,
+  BOUNDS_HALF - 1,
 ];
 
 /** Hard cap on total voxel count (SPEC: "Maximum voxel count"). */

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useMemo } from "react";
+import { useRef, useEffect, useMemo, createContext, useContext, useCallback } from "react";
 import * as THREE from "three";
 import { useVoxelStore, type Voxel } from "../store/voxelStore";
 
@@ -10,8 +10,21 @@ const voxelGeometry = new THREE.BoxGeometry(1, 1, 1);
 // Material for per-instance coloring via instanceColor attribute
 const voxelMaterial = new THREE.MeshStandardMaterial();
 
+// Context to share mesh ref for raycasting
+
+const MeshRefContext = createContext<React.RefObject<THREE.InstancedMesh | null> | null>(null);
+
+export function useMeshRef() {
+  const ref = useContext(MeshRefContext);
+  if (!ref) {
+    throw new Error("useMeshRef must be used within VoxelInstances");
+  }
+  return ref;
+}
+
 export function VoxelInstances() {
-  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const contextRef = useContext(MeshRefContext);
+  const internalRef = useRef<THREE.InstancedMesh>(null);
   const voxels = useVoxelStore((state) => state.voxels);
 
   // Convert voxelMap to ordered array for stable instanceId mapping
@@ -28,7 +41,7 @@ export function VoxelInstances() {
 
   // Rebuild instance matrices and colors only when voxelArray changes
   useEffect(() => {
-    const mesh = meshRef.current;
+    const mesh = internalRef.current;
     if (!mesh) return;
 
     const count = voxelArray.length;
@@ -38,7 +51,13 @@ export function VoxelInstances() {
       mesh.count = count;
     }
 
-    // Update instance matrices and colors
+    // Early return if no voxels (avoid unnecessary work)
+    if (count === 0) {
+      mesh.instanceMatrix.needsUpdate = true;
+      return;
+    }
+
+    // Reuse matrix and color objects to avoid allocations
     const matrix = new THREE.Matrix4();
     const color = new THREE.Color();
 
@@ -50,26 +69,41 @@ export function VoxelInstances() {
       matrix.makeTranslation(x, y, z);
       mesh.setMatrixAt(i, matrix);
 
-      // Set per-instance color
+      // Set per-instance color (setColorAt creates instanceColor if needed)
       color.setHex(voxel.color);
       mesh.setColorAt(i, color);
     }
 
     // Mark attributes as needing update
     mesh.instanceMatrix.needsUpdate = true;
+    // instanceColor is created by setColorAt, so it should exist after the loop
     if (mesh.instanceColor) {
       mesh.instanceColor.needsUpdate = true;
     }
   }, [voxelArray]);
 
+  // Callback ref to sync both refs
+  const setMeshRef = useCallback(
+    (mesh: THREE.InstancedMesh | null) => {
+      internalRef.current = mesh;
+      if (contextRef) {
+        contextRef.current = mesh;
+      }
+    },
+    [contextRef]
+  );
+
   return (
     <instancedMesh
-      ref={meshRef}
+      ref={setMeshRef}
       args={[voxelGeometry, voxelMaterial, voxelArray.length]}
       frustumCulled={false}
     />
   );
 }
+
+// Export the context for use in parent components
+export { MeshRefContext };
 
 // Helper function to map instanceId to voxel position
 // This is used for raycasting to identify which voxel was clicked
