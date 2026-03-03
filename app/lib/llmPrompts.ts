@@ -65,6 +65,22 @@ VoxelSpec JSON Schema:
       "to": { "x": number, "y": number, "z": number },
       "thickness": number (1-4),
       "color": { "kind": "palette", "id": "string" } | { "kind": "hex", "hex": "#RRGGBB" }
+    },
+    {
+      "op": "sphere",
+      "center": { "x": number, "y": number, "z": number },
+      "radius": number,
+      "color": { "kind": "palette", "id": "string" } | { "kind": "hex", "hex": "#RRGGBB" },
+      "hollow": boolean (optional)
+    },
+    {
+      "op": "cylinder",
+      "center": { "x": number, "z": number },
+      "yFrom": number,
+      "yTo": number,
+      "radius": number,
+      "color": { "kind": "palette", "id": "string" } | { "kind": "hex", "hex": "#RRGGBB" },
+      "hollow": boolean (optional)
     }
   ],
   "metadata": {
@@ -73,6 +89,16 @@ VoxelSpec JSON Schema:
     "description": "string (optional)"
   } (optional)
 }
+
+SHAPE DESIGN GUIDELINES:
+- Use multiple commands to build interesting, moderately complex structures.
+- Prefer combining several "box" and "hollowBox" commands for layers, rooms, roofs, arches, and supports.
+- Use "sphere" for domes, trees, or rounded features.
+- Use "cylinder" for pillars, towers, and rounded columns.
+- Use "floor" for ground planes, platforms, or interior floors.
+- Use "line" for details like beams, rails, antennas, or decorative edges.
+- Aim for variation in height and silhouette (not just a single solid cube).
+- Keep everything strictly within bounds and under the voxel cap.
 
 Remember: Output ONLY the JSON object. Nothing else.`;
 
@@ -93,13 +119,19 @@ function getUserPrompt(input: string, mode: GenerationMode): string {
   const modeInstructions: Record<GenerationMode, string> = {
     text: `Generate a voxel structure from this natural language description: "${input}"
 
-Create a reasonable structure that fits within the bounds limits. Use a palette with 2-8 colors. Keep the structure simple and recognizable.`,
+Create a recognizable voxel sculpture that fits within the bounds limits and voxel cap.
+Use a palette with 2-8 colors.
+Use multiple commands (box, hollowBox, floor, line) to add layers, details, and variation in shape.`,
     code: `Generate a voxel structure from this code-like input: "${input}"
 
-Interpret the code structure and translate it into voxel commands. Use appropriate colors and keep within bounds.`,
+Interpret the code structure and translate it into voxel commands.
+Use dimensions or parameters in the code to decide sizes and proportions (e.g., stories, width, depth).
+Use multiple commands and vary height, thickness, and colors while keeping within bounds and voxel cap.`,
     function: `Generate a voxel structure from this function-style input: "${input}"
 
-Parse the function call and generate corresponding voxel commands. Use appropriate colors and keep within bounds.`,
+Parse the function call parameters and generate corresponding voxel commands.
+Use multiple commands to reflect different parts (e.g., base, walls, roof, decorations).
+Keep everything in bounds and under the voxel cap, but prefer richer shapes over a single solid box.`,
   };
 
   return modeInstructions[mode];

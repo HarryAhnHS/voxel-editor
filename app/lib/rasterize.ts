@@ -231,6 +231,76 @@ function rasterizeCommand(
       }
       return voxels;
     }
+    case "sphere": {
+      const center = clampVec3(cmd.center, min, max);
+      const r = cmd.radius;
+      const r2 = r * r;
+      const hollow = cmd.hollow === true;
+
+      const from: Vec3 = {
+        x: Math.max(center.x - r, min.x),
+        y: Math.max(center.y - r, min.y),
+        z: Math.max(center.z - r, min.z),
+      };
+      const to: Vec3 = {
+        x: Math.min(center.x + r, max.x),
+        y: Math.min(center.y + r, max.y),
+        z: Math.min(center.z + r, max.z),
+      };
+
+      const voxels: RasterizedVoxel[] = [];
+      for (let x = from.x; x <= to.x; x++) {
+        const dx2 = (x - center.x) * (x - center.x);
+        for (let y = from.y; y <= to.y; y++) {
+          const dy2 = (y - center.y) * (y - center.y);
+          for (let z = from.z; z <= to.z; z++) {
+            const dz2 = (z - center.z) * (z - center.z);
+            const dist2 = dx2 + dy2 + dz2;
+            if (dist2 > r2) continue;
+            if (hollow) {
+              // For hollow spheres, require distance close to radius.
+              // Use a simple threshold band of 1 voxel.
+              if (dist2 < (r - 1) * (r - 1)) continue;
+            }
+            voxels.push({ x, y, z, color });
+          }
+        }
+      }
+      return voxels;
+    }
+    case "cylinder": {
+      const centerX = clampCoord(cmd.center.x, min.x, max.x);
+      const centerZ = clampCoord(cmd.center.z, min.z, max.z);
+      const yFrom = clampCoord(cmd.yFrom, min.y, max.y);
+      const yTo = clampCoord(cmd.yTo, min.y, max.y);
+      if (yFrom > yTo) return [];
+
+      const r = cmd.radius;
+      const r2 = r * r;
+      const hollow = cmd.hollow === true;
+
+      const fromX = Math.max(centerX - r, min.x);
+      const toX = Math.min(centerX + r, max.x);
+      const fromZ = Math.max(centerZ - r, min.z);
+      const toZ = Math.min(centerZ + r, max.z);
+
+      const voxels: RasterizedVoxel[] = [];
+      for (let y = yFrom; y <= yTo; y++) {
+        for (let x = fromX; x <= toX; x++) {
+          const dx2 = (x - centerX) * (x - centerX);
+          for (let z = fromZ; z <= toZ; z++) {
+            const dz2 = (z - centerZ) * (z - centerZ);
+            const dist2 = dx2 + dz2;
+            if (dist2 > r2) continue;
+            if (hollow) {
+              if (dist2 < (r - 1) * (r - 1)) continue;
+            }
+            voxels.push({ x, y, z, color });
+          }
+        }
+      }
+      return voxels;
+    }
     default: {
       const _never: never = cmd;
       return _never;

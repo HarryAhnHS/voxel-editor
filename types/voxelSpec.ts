@@ -153,11 +153,47 @@ export const lineCommandSchema = z.object({
   thickness: int.min(1).max(4).default(1),
 });
 
+export const sphereCommandSchema = z.object({
+  op: z.literal("sphere"),
+  center: vec3Schema,
+  radius: int.min(1).max(VOXEL_SPEC_MAX_DIMENSION),
+  color: colorRefSchema,
+  // If true, only draw a 1-voxel-thick shell; otherwise filled sphere.
+  hollow: z.boolean().optional(),
+});
+
+export const cylinderCommandSchema = z
+  .object({
+    op: z.literal("cylinder"),
+    // Vertical cylinder aligned to Y axis.
+    center: z.object({
+      x: int,
+      z: int,
+    }),
+    yFrom: int,
+    yTo: int,
+    radius: int.min(1).max(VOXEL_SPEC_MAX_DIMENSION),
+    color: colorRefSchema,
+    // If true, only draw 1-voxel-thick wall; otherwise filled.
+    hollow: z.boolean().optional(),
+  })
+  .superRefine((cmd, ctx) => {
+    if (cmd.yFrom > cmd.yTo) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["yFrom"],
+        message: `"yFrom" must be <= "yTo"`,
+      });
+    }
+  });
+
 export const commandSchema = z.union([
   boxCommandSchema,
   hollowBoxCommandSchema,
   floorCommandSchema,
   lineCommandSchema,
+  sphereCommandSchema,
+  cylinderCommandSchema,
 ]);
 
 export type VoxelCommand = z.infer<typeof commandSchema>;
@@ -217,6 +253,16 @@ export function estimateCommandVoxels(
       const dz = Math.abs(cmd.to.z - cmd.from.z);
       const len = Math.max(dx, dy, dz) + 1;
       return len * cmd.thickness * cmd.thickness;
+    }
+    case "sphere": {
+      const d = cmd.radius * 2 + 1;
+      return d * d * d;
+    }
+    case "cylinder": {
+      const height = cmd.yTo - cmd.yFrom + 1;
+      if (height <= 0) return 0;
+      const d = cmd.radius * 2 + 1;
+      return height * d * d;
     }
     default: {
       // Exhaustive guard.
