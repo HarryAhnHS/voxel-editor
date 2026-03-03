@@ -16,6 +16,7 @@ import {
   TooltipProvider,
 } from "./ui/tooltip";
 import { Separator } from "./ui/separator";
+import { GeneratorPanel } from "./GeneratorPanel";
 
 const COLOR_PRESETS = [
   0x88ccff,
@@ -302,6 +303,11 @@ export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
             </TooltipTrigger>
             <TooltipContent>Color (C)</TooltipContent>
           </Tooltip>
+
+          <Separator />
+
+          {/* Generator */}
+          <GeneratorPanel />
 
           <Separator />
 
