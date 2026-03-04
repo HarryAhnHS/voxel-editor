@@ -9,7 +9,7 @@ import { VoxelInteraction } from "./VoxelInteraction";
 import { VoxelToolbar } from "./VoxelToolbar";
 import { useVoxelStore, BOUNDS_MIN, BOUNDS_MAX } from "../store/voxelStore";
 import { FPSCounter } from "./FPSCounter";
-import { VoxelStoreExample } from "./VoxelStoreExample";
+import { Count } from "./VoxelCount";
 import { StressTest } from "./StressTest";
 import { Separator } from "./ui/separator";
 import { BOUNDS_SIZE } from "../store/voxelConstraints";
@@ -197,11 +197,13 @@ function CoordinateOverlay() {
   );
 }
 
-function ShortcutsHelper() {
-  const [visible, setVisible] = useState(true);
-
-  if (!visible) return null;
-
+function ShortcutsHelper({
+  visible,
+  onVisibleChange,
+}: {
+  visible: boolean;
+  onVisibleChange: (value: boolean) => void;
+}) {
   const Key = ({ children }: { children: React.ReactNode }) => (
     <span className="inline-flex items-center justify-center rounded border border-zinc-700/60 bg-zinc-900/80 px-1.5 h-5 text-[10px] font-mono text-zinc-100">
       {children}
@@ -210,12 +212,16 @@ function ShortcutsHelper() {
 
   return (
     <div className="pointer-events-none absolute bottom-4 right-4 z-10">
-      <div className="pointer-events-auto w-64 rounded-lg border border-zinc-800/70 bg-zinc-950/90 px-3 py-2 text-[11px] text-zinc-200 shadow-lg backdrop-blur-md">
+      <div
+        className={`pointer-events-auto w-64 rounded-lg border border-zinc-800/70 bg-zinc-950/90 px-3 py-2 text-[11px] text-zinc-200 shadow-lg backdrop-blur-md transition-all duration-200 ${
+          visible ? "opacity-100 translate-y-0" : "pointer-events-none opacity-0 translate-y-1"
+        }`}
+      >
         <div className="mb-1 flex items-center justify-between">
           <span className="text-[11px] font-medium text-zinc-100">Shortcuts</span>
           <button
             type="button"
-            onClick={() => setVisible(false)}
+            onClick={() => onVisibleChange(false)}
             className="inline-flex h-5 w-5 items-center justify-center rounded-md border border-transparent text-zinc-500 hover:text-zinc-200 hover:border-zinc-700 transition-colors"
             aria-label="Close shortcuts helper"
           >
@@ -231,9 +237,16 @@ function ShortcutsHelper() {
             <Key>D</Key>
             <span>Remove</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <Key>B</Key>
-            <span>Brush</span>
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-1.5">
+              <Key>B</Key>
+              <span>Brush</span>
+            </div>
+            <div className="ml-4 flex items-center gap-1 text-[9px] text-zinc-500">
+              <span className="h-3 w-3 -ml-1 border-l border-b border-zinc-700 rounded-bl-sm" />
+              <Key>Shift + Click</Key>
+              <span>Connected fill</span>
+            </div>
           </div>
           <div className="flex items-center gap-1.5">
             <Key>M</Key>
@@ -246,6 +259,14 @@ function ShortcutsHelper() {
           <div className="flex items-center gap-1.5">
             <Key>G</Key>
             <span>Generate</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Key>Ctrl/Cmd+Z</Key>
+            <span>Undo</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Key>Ctrl/Cmd+Shift+Z</Key>
+            <span>Redo</span>
           </div>
           <div className="flex items-center gap-1.5">
             <Key>H</Key>
@@ -287,6 +308,7 @@ export function VoxelScene() {
   const backgroundColor = useVoxelStore((state) => state.backgroundColor);
   const undo = useVoxelStore((state) => state.undo);
   const redo = useVoxelStore((state) => state.redo);
+  const [showShortcuts, setShowShortcuts] = useState(true);
 
   const setActiveLayerY = useVoxelStore((state) => state.setActiveLayerY);
   const setPlaneAxis = useVoxelStore((state) => state.setPlaneAxis);
@@ -326,13 +348,6 @@ export function VoxelScene() {
         return;
       }
 
-      // Alternate redo shortcut: Ctrl/Cmd+Y
-      if ((event.ctrlKey || event.metaKey) && (event.key === "y" || event.key === "Y")) {
-        event.preventDefault();
-        redo();
-        return;
-      }
-
       if (event.key === "r" || event.key === "R") {
         event.preventDefault();
         handleResetView();
@@ -354,7 +369,7 @@ export function VoxelScene() {
           <div className="pointer-events-auto flex flex-wrap items-center gap-2 rounded-lg border border-zinc-800/50 bg-zinc-950/80 px-2 py-1.5 text-xs text-zinc-300 shadow-lg backdrop-blur-md sm:flex-nowrap sm:gap-2 sm:px-2">
             <FPSCounter />
             <Separator className="hidden sm:block" />
-            <VoxelStoreExample />
+            <Count />
             <Separator className="hidden sm:block" />
             <StressTest />
           </div>
@@ -362,7 +377,22 @@ export function VoxelScene() {
       )}
 
       <CoordinateOverlay />
-      <ShortcutsHelper />
+      <ShortcutsHelper visible={showShortcuts} onVisibleChange={setShowShortcuts} />
+
+      {/* Shortcuts toggle pill */}
+      <div className="pointer-events-none absolute bottom-4 right-4 z-10">
+        <button
+          type="button"
+          onClick={() => setShowShortcuts((v) => !v)}
+          className="pointer-events-auto ml-auto flex items-center gap-1 rounded-full border border-zinc-800/70 bg-zinc-950/90 px-2 py-1 text-[10px] text-zinc-300 shadow-md backdrop-blur-md transition-colors hover:border-zinc-600 hover:text-zinc-100"
+          aria-label={showShortcuts ? "Hide shortcuts" : "Show shortcuts"}
+        >
+          <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-zinc-600 text-[9px] font-mono">
+            ?
+          </span>
+          <span className="hidden sm:inline">{showShortcuts ? "Hide shortcuts" : "Shortcuts"}</span>
+        </button>
+      </div>
 
       <Canvas
         camera={{ position: [10, 10, 10], fov: 45, near: 0.1, far: 1000 }}

@@ -48,7 +48,21 @@ Voxel disappears.
 
 ---
 
-### 4. Performance Test
+### 4. Brush & Connected Recolor
+
+Steps:
+1. Select "Brush" mode
+2. Click a voxel → only that voxel changes color
+3. Hold **Shift** and click a voxel → all **connected voxels of the same color** change together (flood fill)
+
+Expected:
+- Single click recolors only the targeted voxel
+- Shift+click recolors all voxels in the connected region that share the original color, without affecting other colors
+
+---
+
+### 5. Performance Test
+### 5. Performance Test
 
 Steps:
 1. Use stress test button (if present)

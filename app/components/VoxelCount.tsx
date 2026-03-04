@@ -5,7 +5,7 @@ import { useVoxelStore } from "../store/voxelStore";
 /**
  * Shows voxel count in dev tools.
  */
-export function VoxelStoreExample() {
+export function Count() {
   const voxels = useVoxelStore((s) => s.voxels);
   const count = voxels.size;
 

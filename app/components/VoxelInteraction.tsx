@@ -31,6 +31,7 @@ export function VoxelInteraction() {
   const addVoxel = useVoxelStore((state) => state.addVoxel);
   const removeVoxel = useVoxelStore((state) => state.removeVoxel);
   const recolorVoxel = useVoxelStore((state) => state.recolorVoxel);
+  const recolorVoxels = useVoxelStore((state) => state.recolorVoxels);
   const setPointerPosition = useVoxelStore((state) => state.setPointerPosition);
 
   // Local hover state - cheap, doesn't trigger store updates
@@ -48,6 +49,42 @@ export function VoxelInteraction() {
     color: number;
   } | null>(null);
 
+  // Preview for flood-fill recolor (Shift+Brush)
+  const [recolorFloodPreview, setRecolorFloodPreview] = useState<VoxelPosition[] | null>(null);
+
+  // Helper: compute all connected voxels of the same color starting from a seed position.
+  const computeConnectedRegion = useCallback(
+    (start: VoxelPosition, originalColor: number): VoxelPosition[] => {
+      const result: VoxelPosition[] = [];
+      const visited = new Set<string>();
+      const queue: VoxelPosition[] = [start];
+      const voxelMap = voxels as any as Map<string, Voxel>;
+
+      while (queue.length > 0) {
+        const [cx, cy, cz] = queue.shift()!;
+        const key = keyFromXYZ(cx, cy, cz);
+        if (visited.has(key)) continue;
+        visited.add(key);
+
+        const current = voxelMap.get(key);
+        if (!current || current.color !== originalColor) continue;
+
+        result.push([cx, cy, cz]);
+
+        // 6-connected neighbors
+        queue.push([cx + 1, cy, cz]);
+        queue.push([cx - 1, cy, cz]);
+        queue.push([cx, cy + 1, cz]);
+        queue.push([cx, cy - 1, cz]);
+        queue.push([cx, cy, cz + 1]);
+        queue.push([cx, cy, cz - 1]);
+      }
+
+      return result;
+    },
+    [voxels]
+  );
+
   // Perform raycast and update hover state
   const updateHover = useCallback(
     (event: MouseEvent | React.PointerEvent) => {
@@ -58,6 +95,7 @@ export function VoxelInteraction() {
           isValid: false,
         });
         setRemoveHover(null);
+        setRecolorFloodPreview(null);
         setPointerPosition(null);
         return;
       }
@@ -89,6 +127,7 @@ export function VoxelInteraction() {
               color: voxel.color,
             });
             setPointerPosition(voxel.position);
+              setRecolorFloodPreview(null);
             setHoverState({
               placementPosition: null,
               isValid: false,
@@ -103,11 +142,12 @@ export function VoxelInteraction() {
           placementPosition: null,
           isValid: false,
         });
+        setRecolorFloodPreview(null);
         setPointerPosition(null);
         return;
       }
 
-      // Recolor mode: highlight the voxel that would be recolored
+      // Recolor mode: highlight the voxel(s) that would be recolored
       if (editMode === "recolor") {
         if (meshIntersections.length > 0) {
           const intersection = meshIntersections[0];
@@ -118,10 +158,27 @@ export function VoxelInteraction() {
             instanceId < voxelArray.length
           ) {
             const voxel = voxelArray[instanceId] as Voxel;
-            setRemoveHover({
-              position: voxel.position,
-              color: selectedColor, // Show new color in preview
-            });
+            const [vx, vy, vz] = voxel.position;
+            const originalColor = voxel.color;
+
+            // If Shift is held, preview the entire connected region
+            if ((event as MouseEvent).shiftKey || (event as any).shiftKey) {
+              if (originalColor !== selectedColor) {
+                const region = computeConnectedRegion([vx, vy, vz], originalColor);
+                setRecolorFloodPreview(region);
+              } else {
+                setRecolorFloodPreview(null);
+              }
+              setRemoveHover(null);
+            } else {
+              // Single-voxel recolor preview
+              setRemoveHover({
+                position: voxel.position,
+                color: selectedColor, // Show new color in preview
+              });
+              setRecolorFloodPreview(null);
+            }
+
             setPointerPosition(voxel.position);
             setHoverState({
               placementPosition: null,
@@ -133,6 +190,7 @@ export function VoxelInteraction() {
 
         // Not hovering any voxel
         setRemoveHover(null);
+        setRecolorFloodPreview(null);
         setHoverState({
           placementPosition: null,
           isValid: false,
@@ -143,6 +201,7 @@ export function VoxelInteraction() {
 
       // Add mode: adjacency preview when hovering a voxel, otherwise plane preview
       setRemoveHover(null);
+      setRecolorFloodPreview(null);
 
       // First try surface-adjacent preview when hovering a voxel (Add mode)
       if (meshIntersections.length > 0) {
@@ -225,7 +284,7 @@ export function VoxelInteraction() {
         setPointerPosition(null);
       }
     },
-    [camera, raycaster, gl.domElement, meshRef, voxelArray, voxels, tool, editMode, planeAxis, activeLayerY, selectedColor, setPointerPosition]
+    [camera, raycaster, gl.domElement, meshRef, voxelArray, voxels, tool, editMode, planeAxis, activeLayerY, selectedColor, setPointerPosition, computeConnectedRegion]
   );
 
   // Set up native DOM event listeners to avoid interfering with orbit controls
@@ -310,13 +369,33 @@ export function VoxelInteraction() {
           }
         }
       } else if (editMode === "recolor") {
-        // Recolor mode: raycast instanced mesh and recolor clicked voxel (single click, no drag)
+        // Recolor mode: single-click or shift-click flood fill of connected voxels
         if (meshIntersections.length > 0 && !hasDragged) {
           const intersection = meshIntersections[0];
           const instanceId = intersection.instanceId;
           if (instanceId !== undefined && instanceId >= 0 && instanceId < voxelArray.length) {
-            const voxel = voxelArray[instanceId];
-            recolorVoxel(...voxel.position, selectedColor);
+            const voxel = voxelArray[instanceId] as Voxel;
+            const [vx, vy, vz] = voxel.position;
+            const originalColor = voxel.color;
+
+            if (event.shiftKey) {
+              // Flood fill all connected voxels with the same original color (single history entry)
+              if (originalColor !== selectedColor) {
+                const region = computeConnectedRegion([vx, vy, vz], originalColor);
+                if (region.length > 0) {
+                  const updates = region.map(([x, y, z]) => ({
+                    x,
+                    y,
+                    z,
+                    color: selectedColor,
+                  }));
+                  recolorVoxels(updates);
+                }
+              }
+            } else {
+              // Simple single-voxel recolor (one history entry via recolorVoxel)
+              recolorVoxel(vx, vy, vz, selectedColor);
+            }
           }
         }
       } else {
@@ -411,7 +490,7 @@ export function VoxelInteraction() {
       canvas.removeEventListener("click", handleClick);
       canvas.removeEventListener("mouseleave", handleMouseLeave);
     };
-  }, [gl.domElement, camera, raycaster, meshRef, voxelArray, voxels, tool, editMode, activeLayerY, addVoxel, removeVoxel, recolorVoxel, selectedColor, updateHover]);
+  }, [gl.domElement, camera, raycaster, meshRef, voxelArray, voxels, tool, editMode, activeLayerY, addVoxel, removeVoxel, recolorVoxel, recolorVoxels, selectedColor, updateHover, computeConnectedRegion]);
 
   return (
     <>
@@ -433,8 +512,21 @@ export function VoxelInteraction() {
         />
       )}
 
-      {/* Recolor mode: highlight the voxel that would be recolored */}
-      {tool === "pencil" && editMode === "recolor" && removeHover && (
+      {/* Recolor mode: highlight voxel(s) that would be recolored */}
+      {tool === "pencil" && editMode === "recolor" && recolorFloodPreview && recolorFloodPreview.length > 0 && (
+        <>
+          {recolorFloodPreview.map(([x, y, z]) => (
+            <GhostCube
+              key={keyFromXYZ(x, y, z)}
+              position={[x, y, z]}
+              visible={true}
+              color={selectedColor}
+            />
+          ))}
+        </>
+      )}
+
+      {tool === "pencil" && editMode === "recolor" && !recolorFloodPreview && removeHover && (
         <GhostCube
           position={removeHover.position}
           visible={true}

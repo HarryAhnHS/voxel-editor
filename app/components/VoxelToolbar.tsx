@@ -8,10 +8,8 @@ import {
   RefreshCw,
   Trash2,
   Wrench,
-  CornerUpLeft,
-  CornerUpRight,
 } from "lucide-react";
-import { LuBrush, LuPaintBucket, LuEye, LuEyeOff, LuPalette } from "react-icons/lu";
+import { LuBrush, LuPaintBucket, LuEye, LuEyeOff, LuPalette, LuUndo2, LuRedo2 } from "react-icons/lu";
 import { useVoxelStore, BOUNDS_MIN, BOUNDS_MAX, type PlaneAxis } from "../store/voxelStore";
 import { Button } from "./ui/button";
 import {
@@ -175,7 +173,7 @@ export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
     <TooltipProvider delayDuration={200}>
       <div className="pointer-events-none absolute top-4 left-1/2 z-10 -translate-x-1/2">
         <div className="pointer-events-auto flex items-center gap-1 rounded-lg border border-zinc-800/50 bg-zinc-950/80 px-2 py-1.5 shadow-lg backdrop-blur-md">
-          {/* Add / Remove / Move */}
+          {/* Edit tools */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -233,6 +231,7 @@ export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
             <TooltipContent>Brush (B)</TooltipContent>
           </Tooltip>
 
+          {/* Undo / Redo */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -245,6 +244,39 @@ export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
               </Button>
             </TooltipTrigger>
             <TooltipContent>Move camera (M)</TooltipContent>
+          </Tooltip>
+
+          <Separator />
+
+          {/* Undo / Redo */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => undo()}
+                disabled={!canUndo}
+                aria-label="Undo"
+              >
+                <LuUndo2 className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Undo (Ctrl/Cmd+Z)</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => redo()}
+                disabled={!canRedo}
+                aria-label="Redo"
+              >
+                <LuRedo2 className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Redo (Ctrl/Cmd+Shift+Z, Ctrl/Cmd+Y)</TooltipContent>
           </Tooltip>
 
           <Separator />
@@ -448,37 +480,6 @@ export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
           <GeneratorPanel />
 
           <Separator />
-
-          {/* Undo / Redo */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => undo()}
-                disabled={!canUndo}
-                aria-label="Undo"
-              >
-                <CornerUpLeft className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Undo (Ctrl/Cmd+Z)</TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => redo()}
-                disabled={!canRedo}
-                aria-label="Redo"
-              >
-                <CornerUpRight className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Redo (Ctrl/Cmd+Shift+Z, Ctrl/Cmd+Y)</TooltipContent>
-          </Tooltip>
 
           {/* Dev tools toggle */}
           <Tooltip>
