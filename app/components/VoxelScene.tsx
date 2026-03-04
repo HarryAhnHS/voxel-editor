@@ -2,7 +2,7 @@
 
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
-import { useMemo, useRef, useCallback, useEffect } from "react";
+import { useMemo, useRef, useCallback, useEffect, useState } from "react";
 import * as THREE from "three";
 import { VoxelInstances, MeshRefContext } from "./VoxelInstances";
 import { VoxelInteraction } from "./VoxelInteraction";
@@ -12,6 +12,7 @@ import { FPSCounter } from "./FPSCounter";
 import { VoxelStoreExample } from "./VoxelStoreExample";
 import { StressTest } from "./StressTest";
 import { Separator } from "./ui/separator";
+import { BOUNDS_SIZE } from "../store/voxelConstraints";
 
 function SceneContents() {
   const meshRef = useRef<THREE.InstancedMesh | null>(null);
@@ -23,8 +24,8 @@ function SceneContents() {
       return {
         // Slightly larger than the editable bounds so the grid feels continuous,
         // but keep colors subtle so it stays in the background.
-        size: 44,
-        divisions: 44,
+        size: BOUNDS_SIZE,
+        divisions: BOUNDS_SIZE,
         // Softer center line and very low-contrast grid lines.
         colorCenterLine: 0x6b7280, // zinc-500
         colorGrid: 0x27272a, // zinc-800
@@ -196,6 +197,90 @@ function CoordinateOverlay() {
   );
 }
 
+function ShortcutsHelper() {
+  const [visible, setVisible] = useState(true);
+
+  if (!visible) return null;
+
+  const Key = ({ children }: { children: React.ReactNode }) => (
+    <span className="inline-flex items-center justify-center rounded border border-zinc-700/60 bg-zinc-900/80 px-1.5 h-5 text-[10px] font-mono text-zinc-100">
+      {children}
+    </span>
+  );
+
+  return (
+    <div className="pointer-events-none absolute bottom-4 right-4 z-10">
+      <div className="pointer-events-auto w-64 rounded-lg border border-zinc-800/70 bg-zinc-950/90 px-3 py-2 text-[11px] text-zinc-200 shadow-lg backdrop-blur-md">
+        <div className="mb-1 flex items-center justify-between">
+          <span className="text-[11px] font-medium text-zinc-100">Shortcuts</span>
+          <button
+            type="button"
+            onClick={() => setVisible(false)}
+            className="inline-flex h-5 w-5 items-center justify-center rounded-md border border-transparent text-zinc-500 hover:text-zinc-200 hover:border-zinc-700 transition-colors"
+            aria-label="Close shortcuts helper"
+          >
+            <span className="h-3 w-3 text-[10px] leading-none">&times;</span>
+          </button>
+        </div>
+        <div className="space-y-1.5 text-[10px] text-zinc-400">
+          <div className="flex items-center gap-1.5">
+            <Key>A</Key>
+            <span>Add</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Key>D</Key>
+            <span>Remove</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Key>B</Key>
+            <span>Brush</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Key>M</Key>
+            <span>Move camera</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Key>C</Key>
+            <span>Voxel color</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Key>G</Key>
+            <span>Generate</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Key>H</Key>
+            <span>Grid &amp; axes</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Key>R</Key>
+            <span>Reset view</span>
+          </div>
+          <div className="flex items-center gap-1.5 pt-1">
+            <Key>↑ / ↓</Key>
+            <span>Layer (Y plane)</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Key>← / →</Key>
+            <span>Layer (X/Z plane)</span>
+          </div>
+          <div className="flex items-center gap-1.5 pt-1">
+            <Key>LMB</Key>
+            <span>Orbit + place / erase / brush</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Key>RMB</Key>
+            <span>Pan</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Key>Scroll</Key>
+            <span>Zoom</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function VoxelScene() {
   const controlsRef = useRef<any>(null);
   const showDevTools = useVoxelStore((state) => state.showDevTools);
@@ -257,6 +342,7 @@ export function VoxelScene() {
       )}
 
       <CoordinateOverlay />
+      <ShortcutsHelper />
 
       <Canvas
         camera={{ position: [10, 10, 10], fov: 45, near: 0.1, far: 1000 }}

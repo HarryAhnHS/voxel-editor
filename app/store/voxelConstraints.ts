@@ -6,7 +6,7 @@
 import type { VoxelPosition } from "./voxelStore";
 
 /** Max extent per axis (100 units total, centered around origin). */
-export const BOUNDS_SIZE = 40;
+export const BOUNDS_SIZE = 50;
 
 /** Half-size for centering bounds around origin. */
 const BOUNDS_HALF = Math.floor(BOUNDS_SIZE / 2);
