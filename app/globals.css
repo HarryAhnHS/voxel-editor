@@ -63,3 +63,26 @@ input[type="range"].slider::-moz-range-thumb {
   border: none;
   cursor: pointer;
 }
+
+/* React Colorful styling */
+.react-colorful {
+  width: 100% !important;
+  height: 128px !important;
+}
+
+.react-colorful__saturation {
+  border-radius: 0;
+  border: none;
+}
+
+.react-colorful__hue {
+  border-radius: 0;
+  border-top: 1px solid rgb(63 63 70 / 0.5);
+}
+
+.react-colorful__pointer {
+  width: 16px;
+  height: 16px;
+  border: 2px solid white;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+}

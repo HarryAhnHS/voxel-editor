@@ -193,14 +193,44 @@ function rasterizeCommand(
     }
     case "floor": {
       const y = clampCoord(cmd.y, min.y, max.y);
-      const fromX = cmd.area ? cmd.area.from.x + bounds.origin.x : bounds.origin.x;
-      const toX = cmd.area ? cmd.area.to.x + bounds.origin.x : bounds.origin.x + bounds.size.x - 1;
-      const fromZ = cmd.area ? cmd.area.from.z + bounds.origin.z : bounds.origin.z;
-      const toZ = cmd.area ? cmd.area.to.z + bounds.origin.z : bounds.origin.z + bounds.size.z - 1;
+      let fromX: number;
+      let toX: number;
+      let fromZ: number;
+      let toZ: number;
+      if (cmd.area) {
+        // area is bounds-local (0..size.x-1, 0..size.z-1). Clamp to valid range
+        // so that "full floor" intent works even when spec bounds were clamped.
+        const localMaxX = bounds.size.x - 1;
+        const localMaxZ = bounds.size.z - 1;
+        const localFromX = clampCoord(cmd.area.from.x, 0, localMaxX);
+        const localToX = clampCoord(cmd.area.to.x, 0, localMaxX);
+        const localFromZ = clampCoord(cmd.area.from.z, 0, localMaxZ);
+        const localToZ = clampCoord(cmd.area.to.z, 0, localMaxZ);
+        fromX = bounds.origin.x + Math.min(localFromX, localToX);
+        toX = bounds.origin.x + Math.max(localFromX, localToX);
+        fromZ = bounds.origin.z + Math.min(localFromZ, localToZ);
+        toZ = bounds.origin.z + Math.max(localFromZ, localToZ);
+        console.log("[rasterize] floor", {
+          boundsOrigin: bounds.origin,
+          boundsSize: bounds.size,
+          area: cmd.area,
+          localClamped: { from: { x: Math.min(localFromX, localToX), z: Math.min(localFromZ, localToZ) }, to: { x: Math.max(localFromX, localToX), z: Math.max(localFromZ, localToZ) } },
+          worldFromTo: { fromX, toX, fromZ, toZ },
+        });
+      } else {
+        fromX = bounds.origin.x;
+        toX = bounds.origin.x + bounds.size.x - 1;
+        fromZ = bounds.origin.z;
+        toZ = bounds.origin.z + bounds.size.z - 1;
+        console.log("[rasterize] floor (no area)", { boundsOrigin: bounds.origin, boundsSize: bounds.size, worldFromTo: { fromX, toX, fromZ, toZ } });
+      }
 
       const from = clampVec3({ x: fromX, y, z: fromZ }, min, max);
       const to = clampVec3({ x: toX, y, z: toZ }, min, max);
-      if (from.x > to.x || from.z > to.z) return [];
+      if (from.x > to.x || from.z > to.z) {
+        console.log("[rasterize] floor empty after clamp", { from, to, boundsMin: min, boundsMax: max });
+        return [];
+      }
 
       const voxels: RasterizedVoxel[] = [];
       for (let x = from.x; x <= to.x; x++) {
@@ -208,6 +238,7 @@ function rasterizeCommand(
           voxels.push({ x, y: from.y, z, color });
         }
       }
+      console.log("[rasterize] floor voxelCount", voxels.length, "worldRange", { x: [from.x, to.x], z: [from.z, to.z] });
       return voxels;
     }
     case "line": {
@@ -271,6 +302,7 @@ function rasterizeCommand(
           }
         }
       }
+      console.log("[rasterize] sphere", { center: cmd.center, radius: r, hollow, boundsMin: min, boundsMax: max, voxelCount: voxels.length });
       return voxels;
     }
     case "cylinder": {

@@ -22,7 +22,7 @@ export type VoxelMap = Map<string, Voxel>;
 
 export type Tool = "pencil" | "move";
 
-export type EditMode = "add" | "remove";
+export type EditMode = "add" | "remove" | "recolor";
 
 export type PlaneAxis = "x" | "y" | "z";
 
@@ -42,19 +42,24 @@ export function xyzFromKey(key: string): VoxelPosition {
 interface VoxelState {
   voxels: VoxelMap;
   selectedColor: number;
+  backgroundColor: number;
   tool: Tool;
   editMode: EditMode;
   activeLayerY: number;
   showLayerAxis: boolean;
   showDevTools: boolean;
   planeAxis: PlaneAxis;
+  /** Live pointer position (voxel coords) for UI overlays */
+  pointerPosition: VoxelPosition | null;
 }
 
 interface VoxelActions {
   /** Returns true if voxel was added; false if out of bounds or at cap. */
   addVoxel: (x: number, y: number, z: number, color?: number) => boolean;
   removeVoxel: (x: number, y: number, z: number) => void;
+  recolorVoxel: (x: number, y: number, z: number, color?: number) => void;
   setColor: (color: number) => void;
+  setBackgroundColor: (color: number) => void;
   setTool: (tool: Tool) => void;
   setEditMode: (mode: EditMode) => void;
   setPlaneAxis: (axis: PlaneAxis) => void;
@@ -66,6 +71,12 @@ interface VoxelActions {
   clear: () => void;
   /** Applies batch (e.g. from generator); enforces bounds + cap. Returns count applied. */
   applyVoxels: (voxels: Voxel[]) => number;
+  /** Fill plane at activeLayerY with selected color */
+  fillPlane: () => number;
+  /** Delete all voxels on plane at activeLayerY */
+  deletePlane: () => number;
+  /** Update live pointer position for coordinate overlay */
+  setPointerPosition: (pos: VoxelPosition | null) => void;
 }
 
 const DEFAULT_COLOR = 0x88ccff;
@@ -77,12 +88,14 @@ function createFreshMap(): VoxelMap {
 export const useVoxelStore = create<VoxelState & VoxelActions>((set) => ({
   voxels: createFreshMap(),
   selectedColor: DEFAULT_COLOR,
+  backgroundColor: 0x000000, // Default black background
   tool: "pencil",
   editMode: "add",
   activeLayerY: 0, // Default plane coordinate
   showLayerAxis: true,
   showDevTools: true,
   planeAxis: "y",
+  pointerPosition: null,
 
   addVoxel: (x, y, z, color) => {
     let added = false;
@@ -111,7 +124,21 @@ export const useVoxelStore = create<VoxelState & VoxelActions>((set) => ({
       return { voxels: next };
     }),
 
+  recolorVoxel: (x, y, z, color) =>
+    set((state) => {
+      const key = keyFromXYZ(x, y, z);
+      if (!state.voxels.has(key)) return state;
+      const next = new Map(state.voxels);
+      const voxel = next.get(key)!;
+      next.set(key, {
+        ...voxel,
+        color: color ?? state.selectedColor,
+      });
+      return { voxels: next };
+    }),
+
   setColor: (color) => set({ selectedColor: color }),
+  setBackgroundColor: (color) => set({ backgroundColor: color }),
 
   setTool: (tool) => set({ tool }),
 
@@ -152,6 +179,8 @@ export const useVoxelStore = create<VoxelState & VoxelActions>((set) => ({
 
   clear: () => set({ voxels: createFreshMap() }),
 
+  setPointerPosition: (pos) => set({ pointerPosition: pos }),
+
   applyVoxels: (voxels) => {
     let applied = 0;
     set(() => {
@@ -168,6 +197,77 @@ export const useVoxelStore = create<VoxelState & VoxelActions>((set) => ({
     });
     return applied;
   },
+
+  fillPlane: () => {
+    let filled = 0;
+    set((state) => {
+      const next = new Map(state.voxels);
+      const [minX, minY, minZ] = BOUNDS_MIN;
+      const [maxX, maxY, maxZ] = BOUNDS_MAX;
+      
+      // Fill all positions on the active plane (including replacing existing voxels with new color)
+      for (let x = minX; x <= maxX; x++) {
+        for (let y = minY; y <= maxY; y++) {
+          for (let z = minZ; z <= maxZ; z++) {
+            let matchesPlane = false;
+            switch (state.planeAxis) {
+              case "x":
+                matchesPlane = x === state.activeLayerY;
+                break;
+              case "y":
+                matchesPlane = y === state.activeLayerY;
+                break;
+              case "z":
+                matchesPlane = z === state.activeLayerY;
+                break;
+            }
+            
+            if (matchesPlane && next.size < MAX_VOXEL_COUNT) {
+              const key = keyFromXYZ(x, y, z);
+              // Always set/update the voxel with the current selected color
+              next.set(key, {
+                position: [x, y, z],
+                color: state.selectedColor,
+              });
+              filled++;
+            }
+          }
+        }
+      }
+      return { voxels: next };
+    });
+    return filled;
+  },
+
+  deletePlane: () => {
+    let deleted = 0;
+    set((state) => {
+      const next = new Map(state.voxels);
+      for (const [key, voxel] of state.voxels.entries()) {
+        const [x, y, z] = voxel.position;
+        let matchesPlane = false;
+        switch (state.planeAxis) {
+          case "x":
+            matchesPlane = x === state.activeLayerY;
+            break;
+          case "y":
+            matchesPlane = y === state.activeLayerY;
+            break;
+          case "z":
+            matchesPlane = z === state.activeLayerY;
+            break;
+        }
+        
+        if (matchesPlane) {
+          next.delete(key);
+          deleted++;
+        }
+      }
+      return { voxels: next };
+    });
+    return deleted;
+  },
+
 }));
 
 // Re-export for rasterizer / UI (single source of truth for guardrails)

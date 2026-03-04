@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Pencil, Move3D, Layers, RefreshCw, Trash2, Wrench } from "lucide-react";
+import { 
+  Pencil, 
+  Move3D, 
+  Layers, 
+  RefreshCw, 
+  Trash2, 
+  Wrench
+} from "lucide-react";
+import { LuBrush, LuPaintBucket, LuEye, LuEyeOff, LuPalette } from "react-icons/lu";
 import { useVoxelStore, BOUNDS_MIN, BOUNDS_MAX, type PlaneAxis } from "../store/voxelStore";
 import { Button } from "./ui/button";
 import {
@@ -17,6 +25,7 @@ import {
 } from "./ui/tooltip";
 import { Separator } from "./ui/separator";
 import { GeneratorPanel } from "./GeneratorPanel";
+import { ColorPicker } from "./ui/color-picker";
 
 const COLOR_PRESETS = [
   0x88ccff,
@@ -58,8 +67,13 @@ export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
   const toggleDevTools = useVoxelStore((state) => state.toggleDevTools);
   const clear = useVoxelStore((state) => state.clear);
   const setPlaneAxis = useVoxelStore((state) => state.setPlaneAxis);
+  const fillPlane = useVoxelStore((state) => state.fillPlane);
+  const deletePlane = useVoxelStore((state) => state.deletePlane);
+  const backgroundColor = useVoxelStore((state) => state.backgroundColor);
+  const setBackgroundColor = useVoxelStore((state) => state.setBackgroundColor);
 
   const [colorOpen, setColorOpen] = useState(false);
+  const [bgColorOpen, setBgColorOpen] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -85,6 +99,13 @@ export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
           setEditMode("remove");
           break;
         }
+        case "b":
+        case "B": {
+          event.preventDefault();
+          setTool("pencil");
+          setEditMode("recolor");
+          break;
+        }
         case "m":
         case "M": {
           event.preventDefault();
@@ -93,12 +114,30 @@ export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
         }
         case "ArrowUp": {
           event.preventDefault();
-          incrementLayer();
+          if (planeAxis === "y") {
+            incrementLayer();
+          }
           break;
         }
         case "ArrowDown": {
           event.preventDefault();
-          decrementLayer();
+          if (planeAxis === "y") {
+            decrementLayer();
+          }
+          break;
+        }
+        case "ArrowLeft": {
+          event.preventDefault();
+          if (planeAxis === "x" || planeAxis === "z") {
+            decrementLayer();
+          }
+          break;
+        }
+        case "ArrowRight": {
+          event.preventDefault();
+          if (planeAxis === "x" || planeAxis === "z") {
+            incrementLayer();
+          }
           break;
         }
         case "h":
@@ -120,7 +159,7 @@ export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [setTool, setEditMode, incrementLayer, decrementLayer, toggleLayerAxis]);
+  }, [setTool, setEditMode, incrementLayer, decrementLayer, toggleLayerAxis, setColorOpen, planeAxis]);
 
   const [minY] = BOUNDS_MIN;
   const [maxY] = BOUNDS_MAX;
@@ -128,7 +167,7 @@ export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
   return (
     <TooltipProvider delayDuration={200}>
       <div className="pointer-events-none absolute top-4 left-1/2 z-10 -translate-x-1/2">
-        <div className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-zinc-800 bg-zinc-950/90 px-2.5 py-1.5 shadow-lg backdrop-blur-sm">
+        <div className="pointer-events-auto flex items-center gap-1 rounded-lg border border-zinc-800/50 bg-zinc-950/80 px-2 py-1.5 shadow-lg backdrop-blur-md">
           {/* Add / Remove / Move */}
           <Tooltip>
             <TooltipTrigger asChild>
@@ -171,6 +210,25 @@ export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
+                variant={
+                  tool === "pencil" && editMode === "recolor" ? "primary" : "ghost"
+                }
+                size="icon"
+                onClick={() => {
+                  setTool("pencil");
+                  setEditMode("recolor");
+                }}
+                aria-label="Recolor voxels"
+              >
+                <LuBrush className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Brush (B)</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
                 variant={tool === "move" ? "primary" : "ghost"}
                 size="icon"
                 onClick={() => setTool("move")}
@@ -197,26 +255,20 @@ export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
                     <Layers className="h-4 w-4" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-64" align="start">
-                  <div className="mb-2 text-xs font-medium text-zinc-300">
+                <PopoverContent className="w-64 border-zinc-800/50 bg-zinc-950/95 backdrop-blur-md" align="start">
+                  <div className="mb-3 text-xs font-medium text-zinc-200">
                     Reference plane
                   </div>
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <span className="text-[11px] text-zinc-400">
-                      Plane:{" "}
-                      <span className="font-semibold text-zinc-200 uppercase">
-                        {planeAxis}
-                      </span>{" "}
-                      · Layer:{" "}
-                      <span className="font-semibold text-zinc-200">
-                        {activeLayerY}
-                      </span>
-                    </span>
+                  
+                  {/* Plane axis selector */}
+                  <div className="mb-3 space-y-2">
+                    <div className="text-[11px] text-zinc-400 mb-1.5">Plane axis</div>
                     <div className="flex items-center gap-1.5">
                       <Button
                         size="sm"
                         variant={planeAxis === "x" ? "primary" : "subtle"}
                         onClick={() => setPlaneAxis("x")}
+                        className="flex-1 font-mono"
                       >
                         X
                       </Button>
@@ -224,6 +276,7 @@ export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
                         size="sm"
                         variant={planeAxis === "y" ? "primary" : "subtle"}
                         onClick={() => setPlaneAxis("y")}
+                        className="flex-1 font-mono"
                       >
                         Y
                       </Button>
@@ -231,30 +284,71 @@ export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
                         size="sm"
                         variant={planeAxis === "z" ? "primary" : "subtle"}
                         onClick={() => setPlaneAxis("z")}
+                        className="flex-1 font-mono"
                       >
                         Z
                       </Button>
                     </div>
                   </div>
-                  <input
-                    type="range"
-                    min={minY}
-                    max={maxY}
-                    value={activeLayerY}
-                    onChange={(e) => setActiveLayerY(Number(e.target.value))}
-                    className="mt-1 w-full cursor-pointer accent-zinc-200"
-                  />
-                  <div className="mt-3 flex items-center justify-between">
-                    <span className="text-[11px] text-zinc-400">
-                      Show grid on layer
-                    </span>
+
+                  {/* Layer position */}
+                  <div className="mb-3 space-y-2">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-zinc-400">Layer position</span>
+                      <span className="font-semibold text-zinc-200">{activeLayerY}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={minY}
+                      max={maxY}
+                      value={activeLayerY}
+                      onChange={(e) => setActiveLayerY(Number(e.target.value))}
+                      className="w-full h-1.5 cursor-pointer accent-zinc-400 bg-zinc-800 rounded-lg appearance-none"
+                    />
+                  </div>
+
+                  {/* Show grid & axes toggle */}
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-[11px] text-zinc-400">
+                      {showLayerAxis ? (
+                        <LuEye className="h-3.5 w-3.5" />
+                      ) : (
+                        <LuEyeOff className="h-3.5 w-3.5" />
+                      )}
+                      <span>Grid & axes</span>
+                    </div>
                     <Button
                       size="sm"
                       variant={showLayerAxis ? "primary" : "subtle"}
                       onClick={toggleLayerAxis}
                     >
-                      {showLayerAxis ? "Visible" : "Hidden"}
+                      {showLayerAxis ? "On" : "Off"}
                     </Button>
+                  </div>
+                  
+                  {/* Plane operations */}
+                  <div className="space-y-2">
+                    <div className="text-[11px] font-medium text-zinc-200 mb-2">Operations</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        size="sm"
+                        variant="subtle"
+                        onClick={() => fillPlane()}
+                        className="justify-start"
+                      >
+                        <LuPaintBucket className="h-3.5 w-3.5 mr-1.5" />
+                        Fill
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="subtle"
+                        onClick={() => deletePlane()}
+                        className="justify-start"
+                      >
+                        <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                        Delete
+                      </Button>
+                    </div>
                   </div>
                 </PopoverContent>
               </Popover>
@@ -262,7 +356,7 @@ export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
             <TooltipContent>Reference plane (↑ / ↓, H)</TooltipContent>
           </Tooltip>
 
-          {/* Color */}
+          {/* Voxel color */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Popover open={colorOpen} onOpenChange={setColorOpen}>
@@ -270,7 +364,7 @@ export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    aria-label="Color"
+                    aria-label="Voxel color"
                   >
                     <span
                       className="h-4 w-4 rounded-full border border-zinc-500"
@@ -282,39 +376,63 @@ export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
                     />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-64" align="start">
-                  <div className="mb-2 flex items-center justify-between text-xs">
-                    <span className="font-medium text-zinc-300">
-                      Color
-                    </span>
-                    <span className="text-[11px] text-zinc-400">
-                      #{selectedColor.toString(16).padStart(6, "0")}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-7 gap-1.5">
-                    {COLOR_PRESETS.map((color) => {
-                      const hex = `#${color.toString(16).padStart(6, "0")}`;
-                      const isActive = selectedColor === color;
-                      return (
-                        <button
-                          key={color}
-                          type="button"
-                          onClick={() => setColor(color)}
-                          className={`h-6 w-6 rounded-full border transition-all ${
-                            isActive
-                              ? "border-zinc-50 ring-2 ring-zinc-50/70"
-                              : "border-zinc-700 hover:border-zinc-400"
-                          }`}
-                          style={{ backgroundColor: hex }}
-                          aria-label={`Color ${hex}`}
-                        />
-                      );
-                    })}
+                <PopoverContent className="w-80 border-zinc-800/50 bg-zinc-950/95 backdrop-blur-md" align="start">
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-medium text-zinc-200">Voxel Color</span>
+                      <span className="text-[10px] font-mono text-zinc-500">
+                        #{selectedColor.toString(16).padStart(6, "0").toUpperCase()}
+                      </span>
+                    </div>
+                    <ColorPicker
+                      color={`#${selectedColor.toString(16).padStart(6, "0")}`}
+                      onChange={(hex) => {
+                        const color = parseInt(hex.replace("#", ""), 16);
+                        setColor(color);
+                      }}
+                      presets={COLOR_PRESETS.map((c) => `#${c.toString(16).padStart(6, "0")}`)}
+                    />
                   </div>
                 </PopoverContent>
               </Popover>
             </TooltipTrigger>
-            <TooltipContent>Color (C)</TooltipContent>
+            <TooltipContent>Voxel color (C)</TooltipContent>
+          </Tooltip>
+
+          {/* Background color */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Popover open={bgColorOpen} onOpenChange={setBgColorOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Background color"
+                  >
+                    <LuPalette className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 border-zinc-800/50 bg-zinc-950/95 backdrop-blur-md" align="start">
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-medium text-zinc-200">Background</span>
+                      <span className="text-[10px] font-mono text-zinc-500">
+                        #{backgroundColor.toString(16).padStart(6, "0").toUpperCase()}
+                      </span>
+                    </div>
+                    <ColorPicker
+                      color={`#${backgroundColor.toString(16).padStart(6, "0")}`}
+                      onChange={(hex) => {
+                        const color = parseInt(hex.replace("#", ""), 16);
+                        setBackgroundColor(color);
+                      }}
+                      presets={COLOR_PRESETS.map((c) => `#${c.toString(16).padStart(6, "0")}`)}
+                    />
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </TooltipTrigger>
+            <TooltipContent>Background color</TooltipContent>
           </Tooltip>
 
           <Separator />

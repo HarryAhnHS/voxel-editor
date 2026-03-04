@@ -2,7 +2,6 @@
 
 import { useState, useCallback } from "react";
 import { useVoxelStore, type Voxel } from "../store/voxelStore";
-import { BOUNDS_MAX } from "../store/voxelConstraints";
 
 /**
  * Dev-only stress test: fills scene with ~1000 voxels for performance validation.
@@ -10,10 +9,8 @@ import { BOUNDS_MAX } from "../store/voxelConstraints";
  */
 function fillTestScene(): Voxel[] {
   const voxels: Voxel[] = [];
-  const [maxX, maxY, maxZ] = BOUNDS_MAX;
 
   // Generate a 10x10x10 cube (1000 voxels) centered at origin for visibility
-  // Using positions 0-9 to stay within bounds [0, 99]
   const size = 10;
   const offsetX = 0;
   const offsetY = 0;
@@ -49,9 +46,7 @@ function fillTestScene(): Voxel[] {
  * Shows voxel count and provides button to fill scene with ~1000 voxels.
  */
 export function StressTest() {
-  const voxels = useVoxelStore((s) => s.voxels);
   const applyVoxels = useVoxelStore((s) => s.applyVoxels);
-  const clear = useVoxelStore((s) => s.clear);
   const [isFilling, setIsFilling] = useState(false);
   const [fillTime, setFillTime] = useState<number | null>(null);
 
@@ -76,10 +71,7 @@ export function StressTest() {
   }
 
   return (
-    <div className="flex items-center gap-3 text-xs">
-      <span className="text-zinc-400">
-        Voxels: <strong className="text-zinc-200">{voxels.size}</strong>
-      </span>
+    <div className="flex items-center gap-2 text-xs">
       {fillTime !== null && (
         <span className="text-zinc-500">
           Fill: <strong className="text-zinc-300">{fillTime.toFixed(0)}ms</strong>
@@ -89,19 +81,9 @@ export function StressTest() {
         type="button"
         onClick={handleFillTest}
         disabled={isFilling}
-        className="rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-zinc-300 hover:bg-zinc-700 disabled:opacity-50"
+        className="rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-zinc-300 hover:bg-zinc-700 disabled:opacity-50 text-xs"
       >
-        {isFilling ? "Filling..." : "Fill Test (~1000)"}
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          clear();
-          setFillTime(null);
-        }}
-        className="rounded border border-zinc-700 px-2 py-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-      >
-        Clear
+        {isFilling ? "Filling..." : "Fill Test"}
       </button>
     </div>
   );

@@ -30,6 +30,8 @@ export function VoxelInteraction() {
   const selectedColor = useVoxelStore((state) => state.selectedColor);
   const addVoxel = useVoxelStore((state) => state.addVoxel);
   const removeVoxel = useVoxelStore((state) => state.removeVoxel);
+  const recolorVoxel = useVoxelStore((state) => state.recolorVoxel);
+  const setPointerPosition = useVoxelStore((state) => state.setPointerPosition);
 
   // Local hover state - cheap, doesn't trigger store updates
   const [hoverState, setHoverState] = useState<{
@@ -56,6 +58,7 @@ export function VoxelInteraction() {
           isValid: false,
         });
         setRemoveHover(null);
+        setPointerPosition(null);
         return;
       }
 
@@ -85,6 +88,7 @@ export function VoxelInteraction() {
               position: voxel.position,
               color: voxel.color,
             });
+            setPointerPosition(voxel.position);
             setHoverState({
               placementPosition: null,
               isValid: false,
@@ -99,6 +103,41 @@ export function VoxelInteraction() {
           placementPosition: null,
           isValid: false,
         });
+        setPointerPosition(null);
+        return;
+      }
+
+      // Recolor mode: highlight the voxel that would be recolored
+      if (editMode === "recolor") {
+        if (meshIntersections.length > 0) {
+          const intersection = meshIntersections[0];
+          const instanceId = intersection.instanceId;
+          if (
+            instanceId !== undefined &&
+            instanceId >= 0 &&
+            instanceId < voxelArray.length
+          ) {
+            const voxel = voxelArray[instanceId] as Voxel;
+            setRemoveHover({
+              position: voxel.position,
+              color: selectedColor, // Show new color in preview
+            });
+            setPointerPosition(voxel.position);
+            setHoverState({
+              placementPosition: null,
+              isValid: false,
+            });
+            return;
+          }
+        }
+
+        // Not hovering any voxel
+        setRemoveHover(null);
+        setHoverState({
+          placementPosition: null,
+          isValid: false,
+        });
+        setPointerPosition(null);
         return;
       }
 
@@ -115,6 +154,7 @@ export function VoxelInteraction() {
         );
 
         if (candidate.isValid && candidate.placementPosition) {
+          setPointerPosition(candidate.placementPosition);
           setHoverState({
             placementPosition: candidate.placementPosition,
             isValid: true,
@@ -165,6 +205,7 @@ export function VoxelInteraction() {
           const placementKey = keyFromXYZ(px, py, pz);
           const isOccupied = voxels.has(placementKey);
 
+          setPointerPosition(placementPosition);
           setHoverState({
             placementPosition: isOccupied ? null : placementPosition,
             isValid: !isOccupied,
@@ -174,15 +215,17 @@ export function VoxelInteraction() {
             placementPosition: null,
             isValid: false,
           });
+          setPointerPosition(null);
         }
       } else {
         setHoverState({
           placementPosition: null,
           isValid: false,
         });
+        setPointerPosition(null);
       }
     },
-    [camera, raycaster, gl.domElement, meshRef, voxelArray, voxels, tool, editMode, planeAxis, activeLayerY]
+    [camera, raycaster, gl.domElement, meshRef, voxelArray, voxels, tool, editMode, planeAxis, activeLayerY, selectedColor, setPointerPosition]
   );
 
   // Set up native DOM event listeners to avoid interfering with orbit controls
@@ -266,6 +309,16 @@ export function VoxelInteraction() {
             removeVoxel(...voxel.position);
           }
         }
+      } else if (editMode === "recolor") {
+        // Recolor mode: raycast instanced mesh and recolor clicked voxel (single click, no drag)
+        if (meshIntersections.length > 0 && !hasDragged) {
+          const intersection = meshIntersections[0];
+          const instanceId = intersection.instanceId;
+          if (instanceId !== undefined && instanceId >= 0 && instanceId < voxelArray.length) {
+            const voxel = voxelArray[instanceId];
+            recolorVoxel(...voxel.position, selectedColor);
+          }
+        }
       } else {
         // Add mode: prefer adjacent placement when clicking an existing voxel
         if (meshIntersections.length > 0) {
@@ -339,6 +392,7 @@ export function VoxelInteraction() {
         isValid: false,
       });
       setRemoveHover(null);
+      setPointerPosition(null);
       isMouseDown = false;
       hasDragged = false;
       mouseDownPos = null;
@@ -357,7 +411,7 @@ export function VoxelInteraction() {
       canvas.removeEventListener("click", handleClick);
       canvas.removeEventListener("mouseleave", handleMouseLeave);
     };
-  }, [gl.domElement, camera, raycaster, meshRef, voxelArray, voxels, tool, editMode, activeLayerY, addVoxel, removeVoxel, updateHover]);
+  }, [gl.domElement, camera, raycaster, meshRef, voxelArray, voxels, tool, editMode, activeLayerY, addVoxel, removeVoxel, recolorVoxel, selectedColor, updateHover]);
 
   return (
     <>
@@ -372,6 +426,15 @@ export function VoxelInteraction() {
 
       {/* Remove mode: highlight the voxel that would be deleted */}
       {tool === "pencil" && editMode === "remove" && removeHover && (
+        <GhostCube
+          position={removeHover.position}
+          visible={true}
+          color={removeHover.color}
+        />
+      )}
+
+      {/* Recolor mode: highlight the voxel that would be recolored */}
+      {tool === "pencil" && editMode === "recolor" && removeHover && (
         <GhostCube
           position={removeHover.position}
           visible={true}

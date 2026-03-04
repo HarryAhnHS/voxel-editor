@@ -1,4 +1,4 @@
- "use client";
+"use client";
 
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { VoxelInstances, MeshRefContext } from "./VoxelInstances";
 import { VoxelInteraction } from "./VoxelInteraction";
 import { VoxelToolbar } from "./VoxelToolbar";
-import { useVoxelStore } from "../store/voxelStore";
+import { useVoxelStore, BOUNDS_MIN, BOUNDS_MAX } from "../store/voxelStore";
 import { FPSCounter } from "./FPSCounter";
 import { VoxelStoreExample } from "./VoxelStoreExample";
 import { StressTest } from "./StressTest";
@@ -19,12 +19,17 @@ function SceneContents() {
   const showLayerAxis = useVoxelStore((state) => state.showLayerAxis);
   const planeAxis = useVoxelStore((state) => state.planeAxis);
   const gridConfig = useMemo(
-    () => ({
-      size: 40,
-      divisions: 40,
-      colorCenterLine: 0x555555,
-      colorGrid: 0x333333,
-    }),
+    () => {
+      return {
+        // Slightly larger than the editable bounds so the grid feels continuous,
+        // but keep colors subtle so it stays in the background.
+        size: 44,
+        divisions: 44,
+        // Softer center line and very low-contrast grid lines.
+        colorCenterLine: 0x6b7280, // zinc-500
+        colorGrid: 0x27272a, // zinc-800
+      };
+    },
     []
   );
 
@@ -77,19 +82,22 @@ function SceneContents() {
         intensity={0.4}
       />
 
-      {/* Work plane grid at active layer Y */}
+      {/* Work plane grid + bounds axes guides */}
       {/* eslint-disable-next-line react/no-unknown-property */}
       {showLayerAxis && (
-        <gridHelper
-          position={gridPosition}
-          rotation={gridRotation}
-          args={[
-            gridConfig.size,
-            gridConfig.divisions,
-            gridConfig.colorCenterLine,
-            gridConfig.colorGrid,
-          ]}
-        />
+        <>
+          <gridHelper
+            position={gridPosition}
+            rotation={gridRotation}
+            args={[
+              gridConfig.size,
+              gridConfig.divisions,
+              gridConfig.colorCenterLine,
+              gridConfig.colorGrid,
+            ]}
+          />
+          <BoundsAxes />
+        </>
       )}
 
       {/* Instanced voxel renderer - only rebuilds when voxelMap changes */}
@@ -101,9 +109,100 @@ function SceneContents() {
   );
 }
 
+function BoundsAxes() {
+  const [minX, minY, minZ] = BOUNDS_MIN;
+  const [maxX, maxY, maxZ] = BOUNDS_MAX;
+
+  // Lines along X, Y, Z spanning full bounds in both directions
+  const vertices = new Float32Array([
+    // X axis
+    minX, 0, 0,
+    maxX, 0, 0,
+    // Y axis
+    0, minY, 0,
+    0, maxY, 0,
+    // Z axis
+    0, 0, minZ,
+    0, 0, maxZ,
+  ]);
+
+  const colors = new Float32Array([
+    // X axis (reddish)
+    1.0, 0.4, 0.4,
+    1.0, 0.4, 0.4,
+    // Y axis (greenish)
+    0.4, 1.0, 0.6,
+    0.4, 1.0, 0.6,
+    // Z axis (bluish)
+    0.4, 0.7, 1.0,
+    0.4, 0.7, 1.0,
+  ]);
+
+  return (
+    // eslint-disable-next-line react/no-unknown-property
+    <lineSegments>
+      {/* eslint-disable-next-line react/no-unknown-property */}
+      <bufferGeometry>
+        {/* eslint-disable-next-line react/no-unknown-property */}
+        <bufferAttribute
+          attach="attributes-position"
+          args={[vertices, 3]}
+        />
+        {/* eslint-disable-next-line react/no-unknown-property */}
+        <bufferAttribute
+          attach="attributes-color"
+          args={[colors, 3]}
+        />
+      </bufferGeometry>
+      {/* eslint-disable-next-line react/no-unknown-property */}
+      <lineBasicMaterial vertexColors transparent opacity={0.7} />
+    </lineSegments>
+  );
+}
+
+function CoordinateOverlay() {
+  const pointer = useVoxelStore((state) => state.pointerPosition);
+  const planeAxis = useVoxelStore((state) => state.planeAxis);
+  const activeLayerY = useVoxelStore((state) => state.activeLayerY);
+
+  if (!pointer) return null;
+
+  const [x, y, z] = pointer;
+
+  return (
+    <div className="pointer-events-none absolute bottom-4 left-4 z-10">
+      <div className="pointer-events-auto inline-flex items-center gap-3 rounded-lg border border-zinc-800/60 bg-zinc-950/85 px-3 py-1.5 text-[11px] text-zinc-200 shadow-lg backdrop-blur-md">
+        <div className="flex items-center gap-2 font-mono">
+          <span className="flex items-center gap-1">
+            <span className="text-red-400">X</span>
+            <span>{x}</span>
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="text-emerald-400">Y</span>
+            <span>{y}</span>
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="text-sky-400">Z</span>
+            <span>{z}</span>
+          </span>
+        </div>
+        <Separator orientation="vertical" className="h-4 bg-zinc-700/70" />
+        <div className="text-[10px] text-zinc-400">
+          Plane <span className="font-semibold text-zinc-200">{planeAxis.toUpperCase()}</span>{" "}
+          · Layer <span className="font-semibold text-zinc-200">{activeLayerY}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function VoxelScene() {
   const controlsRef = useRef<any>(null);
   const showDevTools = useVoxelStore((state) => state.showDevTools);
+  const backgroundColor = useVoxelStore((state) => state.backgroundColor);
+
+  const setActiveLayerY = useVoxelStore((state) => state.setActiveLayerY);
+  const setPlaneAxis = useVoxelStore((state) => state.setPlaneAxis);
 
   const handleResetView = useCallback(() => {
     const controls = controlsRef.current;
@@ -113,7 +212,11 @@ export function VoxelScene() {
     controls.target.set(0, 0, 0);
     controls.object.position.set(10, 10, 10);
     controls.update();
-  }, []);
+    
+    // Reset grid to default position
+    setActiveLayerY(0);
+    setPlaneAxis("y");
+  }, [setActiveLayerY, setPlaneAxis]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -136,22 +239,24 @@ export function VoxelScene() {
   }, [handleResetView]);
 
   return (
-    <div className="absolute inset-0 bg-neutral-950">
+    <div className="absolute inset-0" style={{ backgroundColor: `#${backgroundColor.toString(16).padStart(6, "0")}` }}>
       {/* Toolbar */}
       <VoxelToolbar onResetView={handleResetView} />
 
       {/* Developer tools overlay */}
       {showDevTools && (
-        <div className="pointer-events-none absolute top-4 right-4 z-10">
-          <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-zinc-800 bg-zinc-950/70 px-3 py-1.5 text-xs text-zinc-300 shadow-lg backdrop-blur-sm">
+        <div className="pointer-events-none absolute top-4 right-4 z-10 max-w-[calc(100vw-2rem)]">
+          <div className="pointer-events-auto flex flex-wrap items-center gap-2 rounded-lg border border-zinc-800/50 bg-zinc-950/80 px-2 py-1.5 text-xs text-zinc-300 shadow-lg backdrop-blur-md sm:flex-nowrap sm:gap-2 sm:px-2">
             <FPSCounter />
-            <Separator />
+            <Separator className="hidden sm:block" />
             <VoxelStoreExample />
-            <Separator />
+            <Separator className="hidden sm:block" />
             <StressTest />
           </div>
         </div>
       )}
+
+      <CoordinateOverlay />
 
       <Canvas
         camera={{ position: [10, 10, 10], fov: 45, near: 0.1, far: 1000 }}
@@ -159,7 +264,7 @@ export function VoxelScene() {
         gl={{ antialias: true, alpha: false }}
         style={{ width: "100%", height: "100%" }}
       >
-        <color attach="background" args={["#020617"]} />
+        <color attach="background" args={[`#${backgroundColor.toString(16).padStart(6, "0")}`]} />
         <SceneContents />
         <OrbitControls
           ref={controlsRef}

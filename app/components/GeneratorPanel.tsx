@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Sparkles, Loader2 } from "lucide-react";
 import { useVoxelStore, type Voxel } from "../store/voxelStore";
+import { BOUNDS_MIN, BOUNDS_MAX } from "../store/voxelConstraints";
 import { rasterize, type RasterizedVoxel } from "../lib/rasterize";
 import type { VoxelSpec } from "@/types/voxelSpec";
 import { Button } from "./ui/button";
@@ -16,8 +16,7 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from "./ui/tooltip";
-
-type GenerationMode = "text" | "code" | "function";
+import { LuBot } from "react-icons/lu";
 
 interface ApiResponse {
   spec?: VoxelSpec;
@@ -26,13 +25,17 @@ interface ApiResponse {
 }
 
 /**
- * Centers voxels around origin (0,0,0) by calculating bounding box center
- * and translating all voxels. Also flips Y-axis to fix upside-down structures.
+ * Recenters the structure (tree, building, etc.) as much as possible within
+ * the global editor bounds. Uses an integer shift so no per-voxel rounding.
+ * If the structure fits, it is centered at the origin; if it is too large, the
+ * shift is clamped so it stays in bounds and is still centered as much as possible.
  */
 function centerVoxels(voxels: RasterizedVoxel[]): RasterizedVoxel[] {
   if (voxels.length === 0) return voxels;
 
-  // Calculate bounding box
+  const [worldMinX, worldMinY, worldMinZ] = BOUNDS_MIN;
+  const [worldMaxX, worldMaxY, worldMaxZ] = BOUNDS_MAX;
+
   let minX = Infinity, minY = Infinity, minZ = Infinity;
   let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
 
@@ -45,23 +48,30 @@ function centerVoxels(voxels: RasterizedVoxel[]): RasterizedVoxel[] {
     maxZ = Math.max(maxZ, v.z);
   }
 
-  // Calculate center
-  const centerX = (minX + maxX) / 2;
-  const centerY = (minY + maxY) / 2;
-  const centerZ = (minZ + maxZ) / 2;
+  const sizeX = maxX - minX + 1;
+  const sizeY = maxY - minY + 1;
+  const sizeZ = maxZ - minZ + 1;
 
-  // Translate all voxels to center around origin
-  // Flip Y-axis: LLM may generate with Y=0 at "top" (screen coords),
-  // but Three.js uses Y-up where Y=0 is at bottom. Flip by mirroring across center.
-  return voxels.map((v) => {
-    // Then center
-    return {
-      ...v,
-      x: Math.round(v.x - centerX),
-      y: Math.round(v.y - centerY),
-      z: Math.round(v.z - centerZ),
-    };
-  });
+  // Ideal target: bbox centered at origin (or -0.5 for even size).
+  const targetMinX = -Math.floor(sizeX / 2);
+  const targetMinY = -Math.floor(sizeY / 2);
+  const targetMinZ = -Math.floor(sizeZ / 2);
+
+  const idealShiftX = minX - targetMinX;
+  const idealShiftY = minY - targetMinY;
+  const idealShiftZ = minZ - targetMinZ;
+
+  // Clamp shift so the translated bbox stays inside world bounds; prefer ideal (centered) when it fits.
+  const shiftX = Math.max(maxX - worldMaxX, Math.min(minX - worldMinX, idealShiftX));
+  const shiftY = Math.max(maxY - worldMaxY, Math.min(minY - worldMinY, idealShiftY));
+  const shiftZ = Math.max(maxZ - worldMaxZ, Math.min(minZ - worldMinZ, idealShiftZ));
+
+  return voxels.map((v) => ({
+    ...v,
+    x: v.x - shiftX,
+    y: v.y - shiftY,
+    z: v.z - shiftZ,
+  }));
 }
 
 /**
@@ -85,7 +95,6 @@ export function GeneratorPanel() {
   const applyVoxels = useVoxelStore((state) => state.applyVoxels);
 
   const [input, setInput] = useState("");
-  const [mode, setMode] = useState<GenerationMode>("text");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(false);
@@ -121,11 +130,11 @@ export function GeneratorPanel() {
     setOpen(false); // Close popover during generation
 
     try {
-      // Step 1: Call /api/generate
+      // Step 1: Call /api/generate with natural language input only
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input: input.trim(), mode }),
+        body: JSON.stringify({ input: input.trim() }),
       });
 
       const data: ApiResponse = await response.json();
@@ -178,14 +187,14 @@ export function GeneratorPanel() {
               disabled={loading}
             >
               {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="h-4 w-4 animate-spin border border-zinc-500 rounded-full border-t-transparent" />
               ) : (
-                <Sparkles className="h-4 w-4" />
+                <LuBot className="h-4 w-4" />
               )}
             </Button>
           </PopoverTrigger>
         </TooltipTrigger>
-        <TooltipContent>Generate from text/code (G)</TooltipContent>
+        <TooltipContent>Generate from text (G)</TooltipContent>
       </Tooltip>
 
       <PopoverContent className="w-80" align="start">
@@ -199,25 +208,6 @@ export function GeneratorPanel() {
             )}
           </div>
 
-          {/* Mode selector */}
-          <div className="flex gap-1 rounded-md bg-zinc-900 p-1">
-            {(["text", "code", "function"] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setMode(m)}
-                disabled={loading}
-                className={`flex-1 rounded px-2 py-1 text-[11px] font-medium transition-colors ${
-                  mode === m
-                    ? "bg-zinc-700 text-zinc-100"
-                    : "text-zinc-400 hover:text-zinc-200"
-                } disabled:opacity-50`}
-              >
-                {m.charAt(0).toUpperCase() + m.slice(1)}
-              </button>
-            ))}
-          </div>
-
           {/* Input textarea */}
           <textarea
             value={input}
@@ -228,13 +218,7 @@ export function GeneratorPanel() {
                 handleGenerate();
               }
             }}
-            placeholder={
-              mode === "text"
-                ? 'e.g., "small modern house with flat roof"'
-                : mode === "code"
-                  ? 'e.g., "width: 16, height: 8"'
-                  : 'e.g., "makeHouse({ stories: 2 })"'
-            }
+            placeholder='e.g., "tree with spherical leaves and a cylindrical trunk on a grass of green"'
             disabled={loading}
             className="h-24 w-full resize-none rounded-md border border-zinc-700 bg-zinc-950 px-2.5 py-2 text-xs text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-600 disabled:opacity-50"
           />
@@ -256,12 +240,12 @@ export function GeneratorPanel() {
           >
             {loading ? (
               <>
-                <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                <span className="mr-1.5 h-3 w-3 inline-block animate-spin border border-zinc-500 rounded-full border-t-transparent" />
                 Generating...
               </>
             ) : (
               <>
-                <Sparkles className="mr-1.5 h-3 w-3" />
+                <LuBot className="mr-1.5 h-3 w-3" />
                 Generate
               </>
             )}

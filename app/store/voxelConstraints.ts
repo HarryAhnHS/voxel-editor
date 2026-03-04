@@ -13,16 +13,16 @@ const BOUNDS_HALF = Math.floor(BOUNDS_SIZE / 2);
 
 /** Inclusive min position [-50, -50, -50] (centered around origin). */
 export const BOUNDS_MIN: VoxelPosition = [
-  -BOUNDS_HALF,
-  -BOUNDS_HALF,
-  -BOUNDS_HALF,
+  -BOUNDS_HALF + 1,
+  -BOUNDS_HALF + 1,
+  -BOUNDS_HALF + 1,
 ];
 
 /** Inclusive max position [19, 19, 19] (centered around origin). */
 export const BOUNDS_MAX: VoxelPosition = [
-  BOUNDS_HALF - 1,
-  BOUNDS_HALF - 1,
-  BOUNDS_HALF - 1,
+  BOUNDS_HALF -1,
+  BOUNDS_HALF -1,
+  BOUNDS_HALF -1,
 ];
 
 /** Hard cap on total voxel count (SPEC: "Maximum voxel count"). 40³=64k cells; 8k allows ~12% fill. */

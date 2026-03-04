@@ -1,20 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { voxelSpecSchema, type VoxelSpec } from "@/types/voxelSpec";
-import { buildPrompt, type GenerationMode } from "@/app/lib/llmPrompts";
+import { buildPrompt } from "@/app/lib/llmPrompts";
 
 /**
  * API route for LLM-based voxel generation.
  *
  * POST /api/generate
- * Body: { input: string, mode: "text" | "code" | "function" }
+ * Body: { input: string }
  *
  * Returns: { spec: VoxelSpec } | { error: string }
  */
 
 const requestSchema = z.object({
   input: z.string().min(1).max(2000),
-  mode: z.enum(["text", "code", "function"]),
 });
 
 interface ApiError {
@@ -130,10 +129,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { input, mode } = validated.data;
+    const { input } = validated.data;
 
     // First attempt
-    let messages = buildPrompt(input, mode as GenerationMode, false);
+    let messages = buildPrompt(input, false);
     let llmResponse: string | undefined;
     let spec: VoxelSpec;
 
@@ -144,7 +143,7 @@ export async function POST(request: NextRequest) {
       // Retry once with "fix JSON" prompt
       const errorMessage =
         firstError instanceof Error ? firstError.message : String(firstError);
-      messages = buildPrompt(input, mode as GenerationMode, true, llmResponse || "", errorMessage);
+      messages = buildPrompt(input, true, llmResponse || "", errorMessage);
 
       try {
         llmResponse = await callLLM(messages);

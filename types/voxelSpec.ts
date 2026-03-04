@@ -7,6 +7,8 @@ import {
 // These are spec-level guardrails. They intentionally mirror the editor guardrails.
 export const VOXEL_SPEC_MAX_DIMENSION = BOUNDS_SIZE;
 export const VOXEL_SPEC_MAX_VOXELS = MAX_VOXEL_COUNT;
+/** Minimum bounds size per axis so floor and spheres are not clipped to a tiny box. */
+export const VOXEL_SPEC_MIN_DIMENSION = 10;
 
 const int = z.number().int();
 
@@ -24,11 +26,11 @@ export const boundsSizeSchema = vec3Schema.superRefine((size, ctx) => {
   const dims: (keyof Vec3)[] = ["x", "y", "z"];
   for (const key of dims) {
     const v = size[key];
-    if (v <= 0 || v > VOXEL_SPEC_MAX_DIMENSION) {
+    if (v < VOXEL_SPEC_MIN_DIMENSION || v > VOXEL_SPEC_MAX_DIMENSION) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: [key],
-        message: `size.${key} must be in 1..${VOXEL_SPEC_MAX_DIMENSION}`,
+        message: `size.${key} must be in ${VOXEL_SPEC_MIN_DIMENSION}..${VOXEL_SPEC_MAX_DIMENSION} (use larger bounds so floor and spheres are not clipped)`,
       });
     }
   }
