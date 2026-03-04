@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { 
-  Pencil, 
-  Move3D, 
-  Layers, 
-  RefreshCw, 
-  Trash2, 
-  Wrench
+import {
+  Pencil,
+  Move3D,
+  Layers,
+  RefreshCw,
+  Trash2,
+  Wrench,
+  CornerUpLeft,
+  CornerUpRight,
 } from "lucide-react";
 import { LuBrush, LuPaintBucket, LuEye, LuEyeOff, LuPalette } from "react-icons/lu";
 import { useVoxelStore, BOUNDS_MIN, BOUNDS_MAX, type PlaneAxis } from "../store/voxelStore";
@@ -71,6 +73,11 @@ export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
   const deletePlane = useVoxelStore((state) => state.deletePlane);
   const backgroundColor = useVoxelStore((state) => state.backgroundColor);
   const setBackgroundColor = useVoxelStore((state) => state.setBackgroundColor);
+  const undo = useVoxelStore((state) => state.undo);
+  const redo = useVoxelStore((state) => state.redo);
+  // Only subscribe to the pieces of history we care about so we re-render minimally.
+  const canUndo = useVoxelStore((state) => state.past.length > 0);
+  const canRedo = useVoxelStore((state) => state.future.length > 0);
 
   const [colorOpen, setColorOpen] = useState(false);
   const [bgColorOpen, setBgColorOpen] = useState(false);
@@ -441,6 +448,37 @@ export function VoxelToolbar({ onResetView }: VoxelToolbarProps) {
           <GeneratorPanel />
 
           <Separator />
+
+          {/* Undo / Redo */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => undo()}
+                disabled={!canUndo}
+                aria-label="Undo"
+              >
+                <CornerUpLeft className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Undo (Ctrl/Cmd+Z)</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => redo()}
+                disabled={!canRedo}
+                aria-label="Redo"
+              >
+                <CornerUpRight className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Redo (Ctrl/Cmd+Shift+Z, Ctrl/Cmd+Y)</TooltipContent>
+          </Tooltip>
 
           {/* Dev tools toggle */}
           <Tooltip>

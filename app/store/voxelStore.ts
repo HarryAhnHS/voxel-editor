@@ -51,6 +51,12 @@ interface VoxelState {
   planeAxis: PlaneAxis;
   /** Live pointer position (voxel coords) for UI overlays */
   pointerPosition: VoxelPosition | null;
+  /** History of voxel maps for undo (older → newer); last entry is most recent snapshot */
+  past: VoxelMap[];
+  /** Future voxel maps for redo (most recent at index 0) */
+  future: VoxelMap[];
+  /** Maximum number of snapshots to keep in history */
+  maxHistory: number;
 }
 
 interface VoxelActions {
@@ -58,6 +64,10 @@ interface VoxelActions {
   addVoxel: (x: number, y: number, z: number, color?: number) => boolean;
   removeVoxel: (x: number, y: number, z: number) => void;
   recolorVoxel: (x: number, y: number, z: number, color?: number) => void;
+  /** Batch recolor helper used by tools that operate on many voxels at once */
+  recolorVoxels: (
+    updates: { x: number; y: number; z: number; color?: number }[]
+  ) => number;
   setColor: (color: number) => void;
   setBackgroundColor: (color: number) => void;
   setTool: (tool: Tool) => void;
@@ -77,6 +87,13 @@ interface VoxelActions {
   deletePlane: () => number;
   /** Update live pointer position for coordinate overlay */
   setPointerPosition: (pos: VoxelPosition | null) => void;
+  /** Undo last voxel mutation, if any */
+  undo: () => void;
+  /** Redo last undone voxel mutation, if any */
+  redo: () => void;
+  /** Convenience selectors for UI enable/disable */
+  canUndo: () => boolean;
+  canRedo: () => boolean;
 }
 
 const DEFAULT_COLOR = 0x88ccff;
@@ -85,7 +102,26 @@ function createFreshMap(): VoxelMap {
   return new Map();
 }
 
-export const useVoxelStore = create<VoxelState & VoxelActions>((set) => ({
+/** Shallowly clones a voxel map.
+ *  This is safe for history snapshots because voxel objects are treated as immutable:
+ *  every mutation creates a new Voxel object instead of mutating in place. */
+function cloneVoxelMap(map: VoxelMap): VoxelMap {
+  return new Map(map);
+}
+
+function pushHistory(state: VoxelState): { past: VoxelMap[]; future: VoxelMap[] } {
+  const snapshot = cloneVoxelMap(state.voxels);
+  const max = state.maxHistory;
+  const nextPast =
+    state.past.length >= max
+      ? [...state.past.slice(1), snapshot]
+      : [...state.past, snapshot];
+
+  // We always clear redo history on any new mutation.
+  return { past: nextPast, future: [] };
+}
+
+export const useVoxelStore = create<VoxelState & VoxelActions>((set, get) => ({
   voxels: createFreshMap(),
   selectedColor: DEFAULT_COLOR,
   backgroundColor: 0x000000, // Default black background
@@ -96,6 +132,9 @@ export const useVoxelStore = create<VoxelState & VoxelActions>((set) => ({
   showDevTools: true,
   planeAxis: "y",
   pointerPosition: null,
+  past: [],
+  future: [],
+  maxHistory: 50,
 
   addVoxel: (x, y, z, color) => {
     let added = false;
@@ -104,13 +143,22 @@ export const useVoxelStore = create<VoxelState & VoxelActions>((set) => ({
       const pos = clampPosition([x, y, z]);
       if (!isWithinBounds(pos)) return state;
       const key = keyFromXYZ(pos[0], pos[1], pos[2]);
+      const targetColor = color ?? state.selectedColor;
+      const existing = state.voxels.get(key);
+
+      // No-op: voxel already exists with same color, so don't record history or change state.
+      if (existing && existing.color === targetColor) {
+        return state;
+      }
+
+      const history = pushHistory(state);
       const next = new Map(state.voxels);
       next.set(key, {
         position: pos,
-        color: color ?? state.selectedColor,
+        color: targetColor,
       });
       added = true;
-      return { voxels: next };
+      return { voxels: next, ...history };
     });
     return added;
   },
@@ -119,23 +167,61 @@ export const useVoxelStore = create<VoxelState & VoxelActions>((set) => ({
     set((state) => {
       const key = keyFromXYZ(x, y, z);
       if (!state.voxels.has(key)) return state;
+      const history = pushHistory(state);
       const next = new Map(state.voxels);
       next.delete(key);
-      return { voxels: next };
+      return { voxels: next, ...history };
     }),
 
   recolorVoxel: (x, y, z, color) =>
     set((state) => {
       const key = keyFromXYZ(x, y, z);
-      if (!state.voxels.has(key)) return state;
+      const voxel = state.voxels.get(key);
+      if (!voxel) return state;
+      const targetColor = color ?? state.selectedColor;
+
+      // Skip history for no-op recolor.
+      if (voxel.color === targetColor) {
+        return state;
+      }
+
+      const history = pushHistory(state);
       const next = new Map(state.voxels);
-      const voxel = next.get(key)!;
       next.set(key, {
         ...voxel,
-        color: color ?? state.selectedColor,
+        color: targetColor,
       });
-      return { voxels: next };
+      return { voxels: next, ...history };
     }),
+
+  recolorVoxels: (updates) => {
+    let changed = 0;
+    set((state) => {
+      if (updates.length === 0) return state;
+
+      const next = new Map(state.voxels);
+
+      for (const { x, y, z, color } of updates) {
+        const key = keyFromXYZ(x, y, z);
+        const voxel = next.get(key);
+        if (!voxel) continue;
+        const targetColor = color ?? state.selectedColor;
+        if (voxel.color === targetColor) continue;
+
+        next.set(key, { ...voxel, color: targetColor });
+        changed++;
+      }
+
+      if (changed === 0) {
+        // Nothing actually changed; don't touch history.
+        return state;
+      }
+
+      const history = pushHistory(state);
+      return { voxels: next, ...history };
+    });
+    return changed;
+  },
 
   setColor: (color) => set({ selectedColor: color }),
   setBackgroundColor: (color) => set({ backgroundColor: color }),
@@ -177,13 +263,19 @@ export const useVoxelStore = create<VoxelState & VoxelActions>((set) => ({
       showDevTools: !state.showDevTools,
     })),
 
-  clear: () => set({ voxels: createFreshMap() }),
+  clear: () =>
+    set((state) => {
+      // Avoid pushing history if already empty.
+      if (state.voxels.size === 0) return state;
+      const history = pushHistory(state);
+      return { voxels: createFreshMap(), ...history };
+    }),
 
   setPointerPosition: (pos) => set({ pointerPosition: pos }),
 
   applyVoxels: (voxels) => {
     let applied = 0;
-    set(() => {
+    set((state) => {
       const next = createFreshMap();
       for (const v of voxels) {
         if (next.size >= MAX_VOXEL_COUNT) break;
@@ -193,7 +285,24 @@ export const useVoxelStore = create<VoxelState & VoxelActions>((set) => ({
         next.set(key, { position: pos, color: v.color });
       }
       applied = next.size;
-      return { voxels: next };
+
+      // Don't record history if resulting map is identical to current (no-op).
+      if (state.voxels.size === next.size) {
+        let same = true;
+        for (const [key, voxel] of next) {
+          const existing = state.voxels.get(key);
+          if (!existing || existing.color !== voxel.color) {
+            same = false;
+            break;
+          }
+        }
+        if (same) {
+          return state;
+        }
+      }
+
+      const history = pushHistory(state);
+      return { voxels: next, ...history };
     });
     return applied;
   },
@@ -204,7 +313,8 @@ export const useVoxelStore = create<VoxelState & VoxelActions>((set) => ({
       const next = new Map(state.voxels);
       const [minX, minY, minZ] = BOUNDS_MIN;
       const [maxX, maxY, maxZ] = BOUNDS_MAX;
-      
+      let changed = false;
+
       // Fill all positions on the active plane (including replacing existing voxels with new color)
       for (let x = minX; x <= maxX; x++) {
         for (let y = minY; y <= maxY; y++) {
@@ -221,20 +331,32 @@ export const useVoxelStore = create<VoxelState & VoxelActions>((set) => ({
                 matchesPlane = z === state.activeLayerY;
                 break;
             }
-            
+
             if (matchesPlane && next.size < MAX_VOXEL_COUNT) {
               const key = keyFromXYZ(x, y, z);
-              // Always set/update the voxel with the current selected color
-              next.set(key, {
-                position: [x, y, z],
-                color: state.selectedColor,
-              });
-              filled++;
+              const existing = next.get(key);
+              const targetColor = state.selectedColor;
+              // Only treat as a change if we're adding a new voxel or changing color.
+              if (!existing || existing.color !== targetColor) {
+                next.set(key, {
+                  position: [x, y, z],
+                  color: targetColor,
+                });
+                filled++;
+                changed = true;
+              }
             }
           }
         }
       }
-      return { voxels: next };
+
+      if (!changed) {
+        // No voxels changed; avoid recording a useless history entry.
+        return state;
+      }
+
+      const history = pushHistory(state);
+      return { voxels: next, ...history };
     });
     return filled;
   },
@@ -243,6 +365,7 @@ export const useVoxelStore = create<VoxelState & VoxelActions>((set) => ({
     let deleted = 0;
     set((state) => {
       const next = new Map(state.voxels);
+      let changed = false;
       for (const [key, voxel] of state.voxels.entries()) {
         const [x, y, z] = voxel.position;
         let matchesPlane = false;
@@ -261,12 +384,59 @@ export const useVoxelStore = create<VoxelState & VoxelActions>((set) => ({
         if (matchesPlane) {
           next.delete(key);
           deleted++;
+          changed = true;
         }
       }
-      return { voxels: next };
+
+      if (!changed) {
+        return state;
+      }
+
+      const history = pushHistory(state);
+      return { voxels: next, ...history };
     });
     return deleted;
   },
+
+  undo: () =>
+    set((state) => {
+      if (state.past.length === 0) return state;
+
+      // Last entry in past is the most recent snapshot to restore.
+      const previous = state.past[state.past.length - 1];
+      const remainingPast = state.past.slice(0, -1);
+      const futureSnapshot = cloneVoxelMap(state.voxels);
+
+      return {
+        voxels: cloneVoxelMap(previous),
+        past: remainingPast,
+        // We unshift the current state so the newest redo is always at index 0.
+        future: [futureSnapshot, ...state.future],
+      };
+    }),
+
+  redo: () =>
+    set((state) => {
+      if (state.future.length === 0) return state;
+
+      const [nextSnapshot, ...restFuture] = state.future;
+      const pastSnapshot = cloneVoxelMap(state.voxels);
+
+      const max = state.maxHistory;
+      const nextPast =
+        state.past.length >= max
+          ? [...state.past.slice(1), pastSnapshot]
+          : [...state.past, pastSnapshot];
+
+      return {
+        voxels: cloneVoxelMap(nextSnapshot),
+        past: nextPast,
+        future: restFuture,
+      };
+    }),
+
+  canUndo: () => get().past.length > 0,
+  canRedo: () => get().future.length > 0,
 
 }));
 
@@ -307,3 +477,4 @@ export {
 // // Key utilities:
 // const key = keyFromXYZ(1, 2, 3);      // "1,2,3"
 // const [x, y, z] = xyzFromKey(key);    // [1, 2, 3]
+

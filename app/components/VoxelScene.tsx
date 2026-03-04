@@ -285,6 +285,8 @@ export function VoxelScene() {
   const controlsRef = useRef<any>(null);
   const showDevTools = useVoxelStore((state) => state.showDevTools);
   const backgroundColor = useVoxelStore((state) => state.backgroundColor);
+  const undo = useVoxelStore((state) => state.undo);
+  const redo = useVoxelStore((state) => state.redo);
 
   const setActiveLayerY = useVoxelStore((state) => state.setActiveLayerY);
   const setPlaneAxis = useVoxelStore((state) => state.setPlaneAxis);
@@ -313,6 +315,24 @@ export function VoxelScene() {
         return;
       }
 
+      // Undo / redo history (Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z)
+      if ((event.ctrlKey || event.metaKey) && (event.key === "z" || event.key === "Z")) {
+        event.preventDefault();
+        if (event.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+        return;
+      }
+
+      // Alternate redo shortcut: Ctrl/Cmd+Y
+      if ((event.ctrlKey || event.metaKey) && (event.key === "y" || event.key === "Y")) {
+        event.preventDefault();
+        redo();
+        return;
+      }
+
       if (event.key === "r" || event.key === "R") {
         event.preventDefault();
         handleResetView();
@@ -321,7 +341,7 @@ export function VoxelScene() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleResetView]);
+  }, [handleResetView, undo, redo]);
 
   return (
     <div className="absolute inset-0" style={{ backgroundColor: `#${backgroundColor.toString(16).padStart(6, "0")}` }}>
