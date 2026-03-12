@@ -13,11 +13,6 @@ export function FPSCounter() {
   const rafIdRef = useRef<number | null>(null);
 
   useEffect(() => {
-    // Only show in dev mode
-    if (process.env.NODE_ENV === "production") {
-      return;
-    }
-
     const measureFPS = (now: number) => {
       if (lastTimeRef.current === null) {
         lastTimeRef.current = now;
@@ -45,11 +40,6 @@ export function FPSCounter() {
       }
     };
   }, []);
-
-  // Only show in dev mode
-  if (process.env.NODE_ENV === "production") {
-    return null;
-  }
 
   if (fps === null) {
     return null;
